@@ -80,6 +80,9 @@
 </div>
 
 <script>
+    // ⬇️ UPDATE THIS TO YOUR ACTUAL RENDER URL ⬇️
+    const BASE_URL = "https://turf-booking-natl.onrender.com"; 
+
     let selectedSlot = null;
     let isVerified = false;
     const errSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
@@ -100,7 +103,7 @@
 
     async function confirmOTP() {
         const otp = document.getElementById("otpInput").value;
-        const res = await fetch("http://localhost:5000/verify-otp", {
+        const res = await fetch(`${BASE_URL}/verify-otp`, {
             method: "POST", headers: {"Content-Type":"application/json"},
             body: JSON.stringify({ otp })
         });
@@ -117,7 +120,7 @@
 
     async function loadSlots() {
         const dateStr = document.getElementById("date").value;
-        const res = await fetch("http://localhost:5000/bookings");
+        const res = await fetch(`${BASE_URL}/bookings`);
         const data = await res.json();
         const grid = document.getElementById("slots");
         grid.innerHTML = "";
@@ -151,7 +154,7 @@
 
     async function calcPrice() {
         if(selectedSlot === null) return;
-        const res = await fetch("http://localhost:5000/current-price");
+        const res = await fetch(`${BASE_URL}/current-price`);
         const p = await res.json();
         const dur = parseInt(document.getElementById("dur").value);
         let total = 0;
@@ -172,7 +175,7 @@
             duration: parseInt(document.getElementById("dur").value),
             sport: "Online"
         };
-        const res = await fetch("http://localhost:5000/book", {
+        const res = await fetch(`${BASE_URL}/book`, {
             method:"POST", headers:{"Content-Type":"application/json"},
             body:JSON.stringify(body)
         });
@@ -187,8 +190,23 @@
         }
     }
 
+    async function checkStatus() {
+        const res = await fetch(`${BASE_URL}/booking-status`);
+        const s = await res.json();
+        const bookBtn = document.getElementById("bookBtn");
+        const verifyBtn = document.getElementById("verifyBtn");
+        
+        if(s.paused) {
+            bookBtn.disabled = true;
+            verifyBtn.disabled = true;
+            bookBtn.innerText = "Maintenance Paused";
+        } else {
+            verifyBtn.disabled = false;
+            bookBtn.innerText = "Book Now";
+        }
+    }
+
     function returnToPage() {
-        // Reset everything
         selectedSlot = null;
         isVerified = false;
         document.getElementById("name").value = "";
@@ -202,7 +220,7 @@
         loadSlots();
     }
 
-    setInterval(() => { if(document.getElementById("mainContainer").style.display !== "none") loadSlots(); }, 3000);
+    setInterval(() => { if(document.getElementById("mainContainer").style.display !== "none") { loadSlots(); checkStatus(); } }, 3000);
     loadSlots();
 </script>
 </body>
