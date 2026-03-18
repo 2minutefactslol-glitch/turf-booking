@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Admin Dashboard</title>
+    <title>TurfPro Admin | Live Control</title>
+    <script>
+        if (localStorage.getItem("adminLoggedIn") !== "true") {
+            window.location.href = "login.html";
+        }
+    </script>
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#f4f6f9; margin:0; }
         header{ background:#1e3c72; color:white; padding:15px 30px; display: flex; justify-content: space-between; align-items: center; }
@@ -44,7 +49,7 @@
     </div>
 
     <div class="card">
-        <h3>Revenue: <span id="rev">₹0</span></h3>
+        <h3>Revenue Today: <span id="rev">₹0</span></h3>
         <table id="btable">
             <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
             <tbody></tbody>
@@ -53,16 +58,12 @@
 </div>
 
 <script>
-    if (localStorage.getItem("adminLoggedIn") !== "true") {
-        window.location = "login.html";
-    }
-
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     let selectedSlot = null;
 
     function logout() {
         localStorage.removeItem("adminLoggedIn");
-        window.location = "login.html";
+        window.location.href = "login.html";
     }
 
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
@@ -108,17 +109,19 @@
     }
 
     async function sync() {
-        const s = await (await fetch(`${BASE_URL}/booking-status`)).json();
-        document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
-        const d = await (await fetch(`${BASE_URL}/dashboard`)).json();
-        document.getElementById("rev").innerText = "₹" + d.revenue;
-        const b = await (await fetch(`${BASE_URL}/bookings`)).json();
-        const tbody = document.querySelector("#btable tbody");
-        tbody.innerHTML = "";
-        b.forEach(book => {
-            tbody.innerHTML += `<tr><td>${book.name}</td><td>${book.date}</td><td>${fmt(book.startHour)}</td><td><button class="btn-pause" onclick="del('${book._id}')">Cancel</button></td></tr>`;
-        });
-        loadView();
+        try {
+            const s = await (await fetch(`${BASE_URL}/booking-status`)).json();
+            document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
+            const d = await (await fetch(`${BASE_URL}/dashboard`)).json();
+            document.getElementById("rev").innerText = "₹" + d.revenue;
+            const b = await (await fetch(`${BASE_URL}/bookings`)).json();
+            const tbody = document.querySelector("#btable tbody");
+            tbody.innerHTML = "";
+            b.forEach(book => {
+                tbody.innerHTML += `<tr><td>${book.name}</td><td>${book.date}</td><td>${fmt(book.startHour)}</td><td><button class="btn-pause" onclick="del('${book._id}')">Cancel</button></td></tr>`;
+            });
+            loadView();
+        } catch(e) { console.error("Sync failed"); }
     }
 
     async function del(id) { await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); sync(); }
