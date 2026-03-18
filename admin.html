@@ -1,188 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro Admin | Live Control</title>
-    <script>
-        if (localStorage.getItem("adminLoggedIn") !== "true") {
-            window.location.href = "login.html";
-        }
-    </script>
+    <title>TurfPro Admin | High Speed</title>
+    <script>if(localStorage.getItem("adminLoggedIn")!=="true") location.href="login.html";</script>
     <style>
-        body{ font-family: 'Segoe UI', sans-serif; background:#f4f6f9; margin:0; }
-        header{ background:#1e3c72; color:white; padding:15px 30px; display: flex; justify-content: space-between; align-items: center; }
-        .container{ max-width:1100px; margin:auto; padding:30px; }
-        .card{ background:white; padding:25px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-bottom:25px; }
-        input{ width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:8px; box-sizing: border-box;}
-        button{ padding:10px 20px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
-        .btn-pause{ background:#ef4444; } .btn-resume{ background:#22c55e; }
-        .btn-logout{ background:rgba(255,255,255,0.2); border: 1px solid white; }
-        .btn-price{ background:#1e3c72; width: 100%; }
-        .grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:15px; }
-        .slot{ padding:15px; text-align:center; border-radius:8px; border:2px solid #e2e8f0; font-weight:bold; cursor:pointer; background:#22c55e; color:white; }
-        .booked{ background:#ef4444; border-color:#ef4444; cursor:not-allowed; }
-        .selected{ border:3px solid black !important; background: #1e3c72 !important; }
-        .preview{ background:orange !important; }
-        .warning-box { background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+        body{ font-family: sans-serif; background:#f4f6f9; margin:0; }
+        .container{ max-width:1000px; margin:auto; padding:20px; }
+        .card{ background:white; padding:20px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); margin-bottom:20px; }
         table{ width:100%; border-collapse:collapse; }
-        th,td{ border-bottom:1px solid #eee; padding:12px; text-align:center; }
+        th,td{ padding:12px; border-bottom:1px solid #eee; text-align:left; }
+        .btn-del{ background:#ef4444; color:white; border:none; padding:8px; border-radius:5px; cursor:pointer; }
     </style>
 </head>
 <body>
-
-<header>
-    <h1>Admin Panel</h1>
-    <button class="btn-logout" onclick="logout()">Logout</button>
-</header>
-
 <div class="container">
     <div class="card">
-        <h3>System Control: <span id="statusTxt">---</span></h3>
-        <button class="btn-pause" onclick="toggleSys(true)">Pause Bookings</button>
-        <button class="btn-resume" onclick="toggleSys(false)">Resume Bookings</button>
-    </div>
-
-    <div class="card">
-        <h3>Set Custom Price (Hourly)</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-                <label>Day Price (5 AM - 6 PM)</label>
-                <input id="newDayPrice" type="number" placeholder="e.g. 800">
-            </div>
-            <div>
-                <label>Night Price (6 PM - 5 AM)</label>
-                <input id="newNightPrice" type="number" placeholder="e.g. 1200">
-            </div>
-        </div>
-        <button class="btn-price" onclick="updatePrice()">Update Pricing</button>
-        <div class="warning-box">
-            ⚠️ <strong>Notice:</strong> Make sure you pause the bookings before changing the prices to prevent calculation errors.
-        </div>
-    </div>
-
-    <div class="card">
-        <h3>Offline Booking</h3>
-        <input id="offName" placeholder="Name">
-        <input id="offDate" type="date" onchange="loadView()">
-        <input id="offDur" type="number" value="1" min="1" onchange="highlight()">
-        <div id="slots" class="grid"></div>
-        <br><button class="btn-resume" onclick="addOffline()" style="width:100%">Confirm</button>
-    </div>
-
-    <div class="card">
-        <h3>Revenue Today: <span id="rev">₹0</span></h3>
-        <table id="btable">
-            <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
-            <tbody></tbody>
+        <h3>Live Bookings</h3>
+        <table>
+            <thead><tr><th>Customer</th><th>Phone</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
+            <tbody id="bRows"></tbody>
         </table>
     </div>
 </div>
 
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
-    let selectedSlot = null;
-
-    // Prevent past date selection in picker
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById("offDate").setAttribute('min', today);
-    document.getElementById("offDate").value = today;
-
-    function logout() {
-        localStorage.removeItem("adminLoggedIn");
-        window.location.href = "login.html";
-    }
-
-    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
-
-    async function loadView() {
-        const dateInput = document.getElementById("offDate").value;
-        const now = new Date();
-        const todayStr = now.toISOString().split("T")[0];
-        const currentHour = now.getHours();
-
-        try {
-            const res = await fetch(`${BASE_URL}/bookings`);
-            const data = await res.json();
-            const grid = document.getElementById("slots");
-            grid.innerHTML = "";
-            for(let h=0; h<24; h++){
-                const s = document.createElement("div");
-                s.className = "slot";
-                
-                const isPast = (dateInput === todayStr && h <= currentHour);
-                const isBooked = data.find(b => b.date === dateInput && h >= b.startHour && h < b.startHour + b.duration);
-
-                if(isPast) {
-                    s.classList.add("booked");
-                    s.style.background = "#94a3b8"; 
-                    s.style.cursor = "not-allowed";
-                } else if(isBooked) {
-                    s.classList.add("booked");
-                }
-                
-                if(selectedSlot === h) s.classList.add("selected");
-                s.innerText = fmt(h);
-                s.onclick = () => { if(!isPast && !isBooked) { selectedSlot = h; highlight(); } };
-                grid.appendChild(s);
-            }
-            highlight();
-        } catch (e) { console.error("Grid Load Error", e); }
-    }
-
-    function highlight() {
-        const slots = document.querySelectorAll(".slot");
-        const dur = parseInt(document.getElementById("offDur").value);
-        slots.forEach(s => s.classList.remove("preview", "selected"));
-        if(selectedSlot === null) return;
-        for(let i=0; i<dur; i++){
-            let h = selectedSlot + i;
-            if(slots[h] && !slots[h].classList.contains("booked") && slots[h].style.cursor !== "not-allowed") {
-                slots[h].classList.add(i === 0 ? "selected" : "preview");
-            }
-        }
-    }
-
-    async function updatePrice() {
-        const dayPrice = document.getElementById("newDayPrice").value;
-        const nightPrice = document.getElementById("newNightPrice").value;
-        if(!dayPrice || !nightPrice) return alert("Please enter both prices.");
-        const res = await fetch(`${BASE_URL}/set-price`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ dayPrice, nightPrice })
-        });
-        if(res.ok) alert("Pricing updated successfully!");
-        else alert("Failed to update pricing.");
-    }
-
-    async function addOffline() {
-        const body = { name: document.getElementById("offName").value || "Walk-in", date: document.getElementById("offDate").value, startHour: selectedSlot, duration: parseInt(document.getElementById("offDur").value), sport: "Offline" };
-        const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { selectedSlot = null; sync(); } else { alert((await res.json()).message); }
-    }
-
-    async function toggleSys(status) {
-        await fetch(`${BASE_URL}/toggle-booking`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
-        sync();
-    }
 
     async function sync() {
         try {
-            const s = await (await fetch(`${BASE_URL}/booking-status`)).json();
-            document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
-            const d = await (await fetch(`${BASE_URL}/dashboard`)).json();
-            document.getElementById("rev").innerText = "₹" + d.revenue;
-            const b = await (await fetch(`${BASE_URL}/bookings`)).json();
-            const tbody = document.querySelector("#btable tbody");
-            tbody.innerHTML = "";
-            b.forEach(book => {
-                tbody.innerHTML += `<tr><td>${book.name}</td><td>${book.date}</td><td>${fmt(book.startHour)}</td><td><button class="btn-pause" onclick="del('${book._id}')">Cancel</button></td></tr>`;
+            const res = await fetch(`${BASE_URL}/bookings`);
+            const data = await res.json();
+            const tbody = document.getElementById("bRows");
+            
+            // Generate HTML once to prevent flickering
+            let html = "";
+            data.forEach(book => {
+                html += `<tr id="row-${book._id}">
+                    <td><strong>${book.name || 'Walk-in'}</strong></td>
+                    <td>${book.phone || 'N/A'}</td>
+                    <td>${book.date}</td>
+                    <td>${book.startHour}:00 (${book.duration}h)</td>
+                    <td><button class="btn-del" onclick="del('${book._id}')">Cancel</button></td>
+                </tr>`;
             });
-            loadView();
-        } catch(e) { console.error("Sync failed"); }
+            tbody.innerHTML = html;
+        } catch(e) { console.error("Sync Error"); }
     }
 
-    async function del(id) { await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); sync(); }
-    setInterval(sync, 5000);
+    async function del(id) {
+        if(!confirm("Delete this booking?")) return;
+        
+        // ⚡ INSTANT UI REMOVAL (Speed Trick)
+        document.getElementById(`row-${id}`).style.opacity = "0.3";
+        
+        const res = await fetch(`${BASE_URL}/booking/${id}`, { method: "DELETE" });
+        if(res.ok) {
+            document.getElementById(`row-${id}`).remove(); // Immediately remove from DOM
+        } else {
+            alert("Delete failed");
+            sync(); // Refresh if failed
+        }
+    }
+
+    setInterval(sync, 2000); // Faster 2-second sync
     sync();
 </script>
 </body>
