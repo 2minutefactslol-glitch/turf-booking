@@ -1,43 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro | Login</title>
+    <title>TurfPro | Admin Login</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 350px; text-align: center; }
         h2 { color: #1e3c72; margin-bottom: 20px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #eee; border-radius: 10px; box-sizing: border-box; transition: 0.3s; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #eee; border-radius: 10px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #1e3c72; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .admin-link { margin-top: 15px; display: block; color: #666; cursor: pointer; font-size: 14px; text-decoration: underline; }
     </style>
 </head>
 <body>
 <div class="card">
     <h2>Admin Login</h2>
-    <input id="adminUser" type="text" placeholder="Username">
-    <input id="adminPass" type="password" placeholder="Password">
-    <button onclick="adminLogin()">Login to Dashboard</button>
-    <a href="index.html" class="admin-link">Back to Booking Page</a>
+    <input id="user" type="text" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
 </div>
-
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
 
-    async function adminLogin() {
-        const username = document.getElementById("adminUser").value;
-        const password = document.getElementById("adminPass").value;
+    async function login() {
+        const username = document.getElementById("user").value;
+        const password = document.getElementById("pass").value;
 
         const res = await fetch(`${BASE_URL}/admin-login`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {"Content-Type":"application/json"},
             body: JSON.stringify({ username, password })
         });
 
-        if (res.ok) {
+        if(res.ok) {
+            // This key MUST match the one in admin.html
             localStorage.setItem("adminLoggedIn", "true");
-            window.location = "admin.html";
+            window.location.href = "admin.html";
         } else {
-            alert("Invalid Username or Password!");
+            alert("Wrong credentials! Access Denied.");
         }
     }
 </script>
