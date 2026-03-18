@@ -80,7 +80,7 @@
 </div>
 
 <script>
-    // ⬇️ UPDATE THIS TO YOUR ACTUAL RENDER URL ⬇️
+    // ⬇️ ENSURE THIS MATCHES YOUR LIVE RENDER URL ⬇️
     const BASE_URL = "https://turf-booking-natl.onrender.com"; 
 
     let selectedSlot = null;
@@ -90,7 +90,10 @@
 
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
 
-    document.getElementById("date").valueAsDate = new Date();
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("date").setAttribute('min', today);
+    document.getElementById("date").value = today;
 
     async function sendOTPRequest() {
         const name = document.getElementById("name").value;
@@ -124,18 +127,35 @@
         const data = await res.json();
         const grid = document.getElementById("slots");
         grid.innerHTML = "";
+        
         const now = new Date();
         const todayStr = now.toISOString().split("T")[0];
-        const isToday = dateStr === todayStr;
+        const currentHour = now.getHours();
 
         for(let h=0; h<24; h++) {
             const s = document.createElement("div");
             s.className = "slot";
             s.innerText = fmt(h);
-            if(isToday && h <= now.getHours()) s.classList.add("past");
-            else if(data.find(b => b.date === dateStr && h >= b.startHour && h < b.startHour + b.duration)) s.classList.add("booked");
+
+            // Logic to disable past slots for the current day
+            const isPast = (dateStr === todayStr && h <= currentHour);
+            const isBooked = data.find(b => b.date === dateStr && h >= b.startHour && h < b.startHour + b.duration);
+
+            if(isPast) {
+                s.classList.add("past");
+            } else if(isBooked) {
+                s.classList.add("booked");
+            }
+            
             if(selectedSlot === h) s.classList.add("selected");
-            s.onclick = () => { if(!s.classList.contains("booked") && !s.classList.contains("past")) { selectedSlot = h; highlight(); calcPrice(); }};
+            
+            s.onclick = () => { 
+                if(!isBooked && !isPast) { 
+                    selectedSlot = h; 
+                    highlight(); 
+                    calcPrice(); 
+                }
+            };
             grid.appendChild(s);
         }
         highlight();
@@ -148,21 +168,26 @@
         if(selectedSlot === null) return;
         for(let i=0; i<dur; i++){
             let h = selectedSlot + i;
-            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) slots[h].classList.add(i === 0 ? "selected" : "preview");
+            // Prevent highlighting past or booked slots
+            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
+                slots[h].classList.add(i === 0 ? "selected" : "preview");
+            }
         }
     }
 
     async function calcPrice() {
         if(selectedSlot === null) return;
-        const res = await fetch(`${BASE_URL}/current-price`);
-        const p = await res.json();
-        const dur = parseInt(document.getElementById("dur").value);
-        let total = 0;
-        for(let i=0; i<dur; i++){
-            let h = (selectedSlot + i) % 24;
-            total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
-        }
-        document.getElementById("priceBox").innerText = "₹" + total;
+        try {
+            const res = await fetch(`${BASE_URL}/current-price`);
+            const p = await res.json();
+            const dur = parseInt(document.getElementById("dur").value);
+            let total = 0;
+            for(let i=0; i<dur; i++){
+                let h = (selectedSlot + i) % 24;
+                total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
+            }
+            document.getElementById("priceBox").innerText = "₹" + total;
+        } catch (e) { console.error("Price Calc Error", e); }
     }
 
     async function bookNow() {
@@ -191,19 +216,22 @@
     }
 
     async function checkStatus() {
-        const res = await fetch(`${BASE_URL}/booking-status`);
-        const s = await res.json();
-        const bookBtn = document.getElementById("bookBtn");
-        const verifyBtn = document.getElementById("verifyBtn");
-        
-        if(s.paused) {
-            bookBtn.disabled = true;
-            verifyBtn.disabled = true;
-            bookBtn.innerText = "Maintenance Paused";
-        } else {
-            verifyBtn.disabled = false;
-            bookBtn.innerText = "Book Now";
-        }
+        try {
+            const res = await fetch(`${BASE_URL}/booking-status`);
+            const s = await res.json();
+            const bookBtn = document.getElementById("bookBtn");
+            const verifyBtn = document.getElementById("verifyBtn");
+            
+            if(s.paused) {
+                bookBtn.disabled = true;
+                verifyBtn.disabled = true;
+                bookBtn.innerText = "Maintenance Paused";
+            } else {
+                verifyBtn.disabled = false;
+                if(isVerified) bookBtn.disabled = false;
+                bookBtn.innerText = "Book Now";
+            }
+        } catch (e) { console.error("Status Check Error", e); }
     }
 
     function returnToPage() {
@@ -220,7 +248,14 @@
         loadSlots();
     }
 
-    setInterval(() => { if(document.getElementById("mainContainer").style.display !== "none") { loadSlots(); checkStatus(); } }, 3000);
+    // Refresh slots and system status every 5 seconds
+    setInterval(() => { 
+        if(document.getElementById("mainContainer").style.display !== "none") { 
+            loadSlots(); 
+            checkStatus(); 
+        } 
+    }, 5000);
+
     loadSlots();
 </script>
 </body>
