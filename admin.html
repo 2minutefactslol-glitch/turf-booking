@@ -1,175 +1,114 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>TurfPro Admin | Live Control</title>
-    <script>
-        if (localStorage.getItem("adminLoggedIn") !== "true") {
-            window.location.href = "login.html";
-        }
-    </script>
-    <style>
-        body{ font-family: 'Segoe UI', sans-serif; background:#f4f6f9; margin:0; }
-        header{ background:#1e3c72; color:white; padding:15px 30px; display: flex; justify-content: space-between; align-items: center; }
-        .container{ max-width:1100px; margin:auto; padding:30px; }
-        .card{ background:white; padding:25px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-bottom:25px; }
-        input{ width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:8px; box-sizing: border-box;}
-        button{ padding:10px 20px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
-        .btn-pause{ background:#ef4444; } .btn-resume{ background:#22c55e; }
-        .btn-logout{ background:rgba(255,255,255,0.2); border: 1px solid white; }
-        .btn-price{ background:#1e3c72; width: 100%; }
-        .grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:15px; }
-        .slot{ padding:15px; text-align:center; border-radius:8px; border:2px solid #e2e8f0; font-weight:bold; cursor:pointer; background:#22c55e; color:white; }
-        .booked{ background:#ef4444; border-color:#ef4444; cursor:not-allowed; }
-        .selected{ border:3px solid black !important; background: #1e3c72 !important; }
-        .preview{ background:orange !important; }
-        .warning-box { background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
-        table{ width:100%; border-collapse:collapse; }
-        th,td{ border-bottom:1px solid #eee; padding:12px; text-align:center; }
-    </style>
-</head>
-<body>
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
 
-<header>
-    <h1>Admin Panel</h1>
-    <button class="btn-logout" onclick="logout()">Logout</button>
-</header>
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-<div class="container">
-    <div class="card">
-        <h3>System Control: <span id="statusTxt">---</span></h3>
-        <button class="btn-pause" onclick="toggleSys(true)">Pause Bookings</button>
-        <button class="btn-resume" onclick="toggleSys(false)">Resume Bookings</button>
-    </div>
+/* CLOUD DATABASE CONNECTION */
+const DB_URI = "mongodb://Admin:Nihalreddy123@ac-ktmpoty-shard-00-00.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-01.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-02.d0nniyi.mongodb.net:27017/turf?ssl=true&replicaSet=atlas-14f8at-shard-0&authSource=admin&retryWrites=true&w=majority";
 
-    <div class="card">
-        <h3>Set Custom Price (Hourly)</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-                <label>Day Price (5 AM - 6 PM)</label>
-                <input id="newDayPrice" type="number" placeholder="e.g. 800">
-            </div>
-            <div>
-                <label>Night Price (6 PM - 5 AM)</label>
-                <input id="newNightPrice" type="number" placeholder="e.g. 1200">
-            </div>
-        </div>
-        <button class="btn-price" onclick="updatePrice()">Update Pricing</button>
-        <div class="warning-box">
-            ⚠️ <strong>Notice:</strong> Make sure you pause the bookings before changing the prices to prevent calculation errors.
-        </div>
-    </div>
+mongoose.connect(DB_URI)
+    .then(() => console.log("✅ Cloud MongoDB Connected"))
+    .catch(err => console.log("❌ DB Connection Error:", err));
 
-    <div class="card">
-        <h3>Offline Booking</h3>
-        <input id="offName" placeholder="Name">
-        <input id="offDate" type="date" onchange="loadView()">
-        <input id="offDur" type="number" value="1" min="1" onchange="highlight()">
-        <div id="slots" class="grid"></div>
-        <br><button class="btn-resume" onclick="addOffline()" style="width:100%">Confirm</button>
-    </div>
+/* SCHEMAS & MODELS */
+const Booking = mongoose.model("Booking", new mongoose.Schema({
+    name: String, phone: String, sport: String, date: String,
+    startHour: Number, duration: Number, players: Number, totalPrice: Number
+}));
 
-    <div class="card">
-        <h3>Revenue Today: <span id="rev">₹0</span></h3>
-        <table id="btable">
-            <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-</div>
+const Price = mongoose.model("Price", new mongoose.Schema({ dayPrice: Number, nightPrice: Number }));
+const Setting = mongoose.model("Setting", new mongoose.Schema({ bookingPaused: Boolean }));
 
-<script>
-    const BASE_URL = "https://turf-booking-natl.onrender.com";
-    let selectedSlot = null;
+/* INITIALIZE DEFAULTS */
+async function init() {
+    try {
+        if (!await Price.findOne()) await Price.create({ dayPrice: 800, nightPrice: 1200 });
+        if (!await Setting.findOne()) await Setting.create({ bookingPaused: false });
+    } catch (e) { console.log("Init error:", e); }
+}
+init();
 
-    function logout() {
-        localStorage.removeItem("adminLoggedIn");
-        window.location.href = "login.html";
+/* --- AUTHENTICATION ROUTES --- */
+app.post("/admin-login", (req, res) => {
+    const { username, password } = req.body;
+    if (username === "Jadalzamana" && password === "Ayasher123") {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false, message: "Invalid Credentials" });
+    }
+});
+
+/* --- BOOKING & PRICING ROUTES --- */
+app.post("/book", async (req, res) => {
+    const { date, startHour, duration } = req.body;
+    
+    // --- DATE VALIDATION LOGIC ---
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Block past dates
+    if (date < todayStr) {
+        return res.status(400).json({ message: "Cannot book a past date." });
+    }
+    // Block past hours for today
+    if (date === todayStr && startHour <= now.getHours()) {
+        return res.status(400).json({ message: "Cannot book a past time slot." });
     }
 
-    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
+    const s = await Setting.findOne();
+    if (s.bookingPaused) return res.status(403).json({ message: "Bookings are paused." });
+    
+    const existing = await Booking.find({ date });
+    const isOverlap = existing.some(b => (startHour < (b.startHour + b.duration) && (startHour + duration) > b.startHour));
+    if (isOverlap) return res.status(400).json({ message: "Slot already taken!" });
 
-    async function loadView() {
-        const date = document.getElementById("offDate").value;
-        const res = await fetch(`${BASE_URL}/bookings`);
-        const data = await res.json();
-        const grid = document.getElementById("slots");
-        grid.innerHTML = "";
-        for(let h=0; h<24; h++){
-            const s = document.createElement("div");
-            s.className = "slot";
-            if(data.find(b => b.date === date && h >= b.startHour && h < b.startHour + b.duration)) s.classList.add("booked");
-            if(selectedSlot === h) s.classList.add("selected");
-            s.innerText = fmt(h);
-            s.onclick = () => { if(!s.classList.contains("booked")) { selectedSlot = h; highlight(); } };
-            grid.appendChild(s);
-        }
-        highlight();
-    }
+    await new Booking(req.body).save();
+    res.json({ message: "Booking Confirmed!" });
+});
 
-    function highlight() {
-        const slots = document.querySelectorAll(".slot");
-        const dur = parseInt(document.getElementById("offDur").value);
-        slots.forEach(s => s.classList.remove("preview", "selected"));
-        if(selectedSlot === null) return;
-        for(let i=0; i<dur; i++){
-            let h = selectedSlot + i;
-            if(slots[h] && !slots[h].classList.contains("booked")) slots[h].classList.add(i === 0 ? "selected" : "preview");
-        }
-    }
+app.get("/bookings", async (req, res) => res.json(await Booking.find()));
+app.delete("/booking/:id", async (req, res) => { 
+    await Booking.findByIdAndDelete(req.params.id); 
+    res.json({ message: "Deleted" }); 
+});
 
-    async function updatePrice() {
-        const dayPrice = document.getElementById("newDayPrice").value;
-        const nightPrice = document.getElementById("newNightPrice").value;
-        if(!dayPrice || !nightPrice) return alert("Please enter both prices.");
+app.get("/current-price", async (req, res) => res.json(await Price.findOne()));
 
-        const res = await fetch(`${BASE_URL}/set-price`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ dayPrice, nightPrice })
+app.post("/set-price", async (req, res) => {
+    try {
+        await Price.updateOne({}, { 
+            dayPrice: Number(req.body.dayPrice), 
+            nightPrice: Number(req.body.nightPrice) 
         });
-        if(res.ok) alert("Pricing updated successfully!");
-        else alert("Failed to update pricing.");
+        res.json({ message: "Prices Updated" });
+    } catch (e) {
+        res.status(500).json({ message: "Failed to update prices" });
     }
+});
 
-    async function addOffline() {
-        const body = { name: document.getElementById("offName").value || "Walk-in", date: document.getElementById("offDate").value, startHour: selectedSlot, duration: parseInt(document.getElementById("offDur").value), sport: "Offline" };
-        const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { selectedSlot = null; sync(); } else alert("Error");
-    }
+app.get("/booking-status", async (req, res) => res.json({ paused: (await Setting.findOne()).bookingPaused }));
 
-    async function toggleSys(status) {
-        await fetch(`${BASE_URL}/toggle-booking`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
-        sync();
-    }
+app.post("/toggle-booking", async (req, res) => {
+    await Setting.updateOne({}, { bookingPaused: req.body.status });
+    res.json({ message: "Status Updated" });
+});
 
-    async function sync() {
-        try {
-            const s = await (await fetch(`${BASE_URL}/booking-status`)).json();
-            document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
-            const d = await (await fetch(`${BASE_URL}/dashboard`)).json();
-            document.getElementById("rev").innerText = "₹" + d.revenue;
-            
-            // Auto-fill current prices
-            const p = await (await fetch(`${BASE_URL}/current-price`)).json();
-            if(p && !document.getElementById("newDayPrice").value) {
-                document.getElementById("newDayPrice").value = p.dayPrice;
-                document.getElementById("newNightPrice").value = p.nightPrice;
-            }
+app.get("/dashboard", async (req, res) => {
+    const today = new Date().toISOString().split('T')[0];
+    const bookings = await Booking.find({ date: today });
+    const p = await Price.findOne();
+    let rev = 0;
+    bookings.forEach(b => { 
+        for(let i=0; i<b.duration; i++) {
+            let h = (b.startHour + i) % 24;
+            rev += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
+        }
+    });
+    res.json({ revenue: rev, bookings: bookings.length });
+});
 
-            const b = await (await fetch(`${BASE_URL}/bookings`)).json();
-            const tbody = document.querySelector("#btable tbody");
-            tbody.innerHTML = "";
-            b.forEach(book => {
-                tbody.innerHTML += `<tr><td>${book.name}</td><td>${book.date}</td><td>${fmt(book.startHour)}</td><td><button class="btn-pause" onclick="del('${book._id}')">Cancel</button></td></tr>`;
-            });
-            loadView();
-        } catch(e) { console.error("Sync failed"); }
-    }
-
-    async function del(id) { await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); sync(); }
-    document.getElementById("offDate").valueAsDate = new Date();
-    setInterval(sync, 5000);
-    sync();
-</script>
-</body>
-</html>
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
