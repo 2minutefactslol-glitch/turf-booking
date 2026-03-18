@@ -32,7 +32,7 @@ app.post("/verify-otp", (req, res) => {
 });
 
 app.post("/book", async (req, res) => {
-    const { name, phone, date, startHour, duration, sport } = req.body;
+    const { name, phone, date, startHour, duration } = req.body;
     
     // --- FORCE INDIA TIMEZONE ---
     const indiaTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"});
@@ -49,7 +49,7 @@ app.post("/book", async (req, res) => {
     if (date === todayStr && startHour <= currentHour) return res.status(400).json({ message: "This time has already passed." });
 
     const s = await Setting.findOne();
-    if (s.bookingPaused) return res.status(403).json({ message: "Bookings are currently paused." });
+    if (s.bookingPaused && req.body.sport !== "Offline") return res.status(403).json({ message: "Online Bookings are paused." });
 
     const existing = await Booking.find({ date });
     const isOverlap = existing.some(b => (startHour < (b.startHour + b.duration) && (startHour + duration) > b.startHour));
