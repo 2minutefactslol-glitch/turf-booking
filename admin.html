@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body{ font-family:Segoe UI; background:#f4f6f9; margin:0; }
+        header{ background:#1e3c72; color:white; padding:20px; text-align:center; }
+        .container{ max-width:1100px; margin:auto; padding:30px; }
+        .card{ background:white; padding:25px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-bottom:25px; }
+        input{ width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:8px; box-sizing: border-box;}
+        button{ padding:12px 20px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+        .btn-pause{ background:#ef4444; } .btn-resume{ background:#22c55e; }
+        .grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:15px; }
+        .slot{ padding:15px; text-align:center; border-radius:8px; border:2px solid #e2e8f0; font-weight:bold; cursor:pointer; background:#22c55e; color:white; }
+        .booked{ background:#ef4444; border-color:#ef4444; cursor:not-allowed; }
+        .selected{ border:3px solid black !important; background: #1e3c72 !important; transform:scale(1.02); }
+        .preview{ background:orange !important; border-color:orange !important; }
+        table{ width:100%; border-collapse:collapse; margin-top:20px; }
+        th,td{ border-bottom:1px solid #eee; padding:12px; text-align:center; }
+    </style>
+</head>
+<body>
+<header><h1>Admin Dashboard</h1></header>
+<div class="container">
+    <div class="card">
+        <h3>System Control: <span id="statusTxt">---</span></h3>
+        <button class="btn-pause" onclick="toggleSys(true)">Pause Bookings</button>
+        <button class="btn-resume" onclick="toggleSys(false)">Resume Bookings</button>
+    </div>
+
+    <div class="card">
+        <h3>Manual / Offline Booking</h3>
+        <input id="offName" placeholder="Customer Name">
+        <input id="offDate" type="date" onchange="loadView()">
+        <input id="offDur" type="number" value="1" min="1" onchange="highlight()">
+        <div id="slots" class="grid"></div>
+        <br><button class="btn-resume" onclick="addOffline()">Confirm Booking</button>
+    </div>
+
+    <div class="card">
+        <h3>Revenue: <span id="rev">₹0</span></h3>
+        <table id="btable">
+            <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let selectedSlot = null;
+    const errSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    const successSound = new Audio("https://actions.google.com/sounds/v1/notifications/positive_notification.ogg");
+
+    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
+
+    async function loadView() {
+        const date = document.getElementById("offDate").value;
+        const res = await fetch("http://localhost:5000/bookings");
+        const data = await res.json();
+        const grid = document.getElementById("slots");
+        grid.innerHTML = "";
+        
+        for(let h=0; h<24; h++){
+            const s = document.createElement("div");
+            s.className = "slot";
+            if(data.find(b => b.date === date && h >= b.startHour && h < b.startHour + b.duration)) s.classList.add("booked");
+            
+            // Re-apply selection state during redraw
+            if(selectedSlot === h) s.classList.add("selected");
+            
+            s.innerText = fmt(h);
+            s.onclick = () => { 
+                if(!s.classList.contains("booked")) { 
+                    selectedSlot = h; 
+                    highlight(); 
+                } 
+            };
+            grid.appendChild(s);
+        }
+        highlight(); // Update preview blocks
+    }
+
+    function highlight() {
+        const slots = document.querySelectorAll(".slot");
+        const dur = parseInt(document.getElementById("offDur").value);
+        slots.forEach(s => s.classList.remove("preview", "selected"));
+        if(selectedSlot === null) return;
+        
+        for(let i=0; i<dur; i++){
+            let h = selectedSlot + i;
+            if(slots[h] && !slots[h].classList.contains("booked")) {
+                slots[h].classList.add(i === 0 ? "selected" : "preview");
+            }
+        }
+    }
+
+    async function addOffline() {
+        const body = {
+            name: document.getElementById("offName").value || "Offline User", 
+            date: document.getElementById("offDate").value,
+            startHour: selectedSlot, 
+            duration: parseInt(document.getElementById("offDur").value), 
+            sport: "Offline"
+        };
+        const res = await fetch("http://localhost:5000/book", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+        const data = await res.json();
+        if(!res.ok) { errSound.play(); alert(data.message); }
+        else { successSound.play(); alert(data.message); selectedSlot=null; sync(); }
+    }
+
+    async function toggleSys(status) {
+        await fetch("http://localhost:5000/toggle-booking", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
+        sync();
+    }
+
+    async function sync() {
+        const sRes = await fetch("http://localhost:5000/booking-status");
+        const s = await sRes.json();
+        document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
+        
+        const dRes = await fetch("http://localhost:5000/dashboard");
+        const d = await dRes.json();
+        document.getElementById("rev").innerText = "₹" + d.revenue;
+
+        const bRes = await fetch("http://localhost:5000/bookings");
+        const b = await bRes.json();
+        const tbody = document.querySelector("#btable tbody");
+        tbody.innerHTML = "";
+        b.forEach(book => {
+            tbody.innerHTML += `<tr><td>${book.name}</td><td>${book.date}</td><td>${fmt(book.startHour)}</td><td><button class="btn-pause" onclick="del('${book._id}')">Cancel</button></td></tr>`;
+        });
+        loadView();
+    }
+
+    async function del(id) { await fetch(`http://localhost:5000/booking/${id}`, {method:"DELETE"}); sync(); }
+    document.getElementById("offDate").valueAsDate = new Date();
+    setInterval(sync, 4000);
+    sync();
+</script>
+</body>
+</html>

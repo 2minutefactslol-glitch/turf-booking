@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TurfPro Customer | Verified Booking</title>
+    <style>
+        body{ font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; }
+        .container{ max-width:1100px; margin:2rem auto; display:grid; grid-template-columns: 350px 1fr; gap:2rem; padding: 0 1rem;}
+        .card{ background:white; padding:1.5rem; border-radius:15px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        /* THANK YOU SCREEN STYLES */
+        #thankYouScreen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .success-icon { font-size: 80px; color: #22c55e; margin-bottom: 20px; }
+        .return-link { margin-top: 20px; color: #1e3c72; cursor: pointer; text-decoration: underline; font-weight: bold; }
+
+        input{ width:100%; padding:12px; margin-bottom:1rem; border:1px solid #cbd5e1; border-radius:8px; box-sizing: border-box; }
+        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap:10px; }
+        .slot{ padding:15px 5px; background: #22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; border:2px solid transparent; transition: 0.2s; }
+        .booked{ background:#fee2e2; color:#ef4444; cursor:not-allowed; }
+        .past{ background:#e2e8f0; color:#94a3b8; cursor:not-allowed; }
+        .selected{ border-color: #1e3c72; background: #1e3c72 !important; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+        .preview{ background: #f59e0b; }
+        .btn-book{ width:100%; padding:1rem; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1.1rem; }
+        .btn-verify{ background: #1e3c72; margin-bottom: 10px; }
+        .btn-book:disabled{ background:#94a3b8 !important; cursor:not-allowed; }
+        .otp-box { display: none; background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px dashed #1e3c72; }
+    </style>
+</head>
+<body>
+
+<div id="thankYouScreen">
+    <div class="success-icon">✔</div>
+    <h1>Thank You for Booking!</h1>
+    <p>Your slot has been successfully reserved.</p>
+    <p>We have sent the details to your verified phone number.</p>
+    <div class="return-link" onclick="returnToPage()">Return to Booking Page</div>
+</div>
+
+<div class="container" id="mainContainer">
+    <aside class="card">
+        <h3>Booking Details</h3>
+        
+        <label>Customer Name *</label>
+        <input id="name" placeholder="Full Name (Required)">
+        
+        <label>Phone Number *</label>
+        <input id="phone" type="tel" maxlength="10" placeholder="10-digit number">
+        
+        <div id="otpContainer" class="otp-box">
+            <label>Enter Demo OTP (123456)</label>
+            <input id="otpInput" type="number" placeholder="Enter OTP">
+            <button class="btn-book" onclick="confirmOTP()">Verify & Unlock</button>
+        </div>
+
+        <button id="verifyBtn" class="btn-book btn-verify" onclick="sendOTPRequest()">Verify Phone to Book</button>
+
+        <label>Date</label>
+        <input id="date" type="date" onchange="loadSlots()">
+        
+        <label>Duration (Hours)</label>
+        <input id="dur" type="number" value="1" min="1" max="12" onchange="highlight(); calcPrice();">
+        
+        <div id="priceBox" style="text-align:center; font-size:1.8rem; font-weight:bold; margin:1rem 0; color: #1e3c72;">₹0</div>
+        
+        <button id="bookBtn" class="btn-book" onclick="bookNow()" disabled>Book Now</button>
+    </aside>
+
+    <main class="card">
+        <div id="slots" class="grid"></div>
+    </main>
+</div>
+
+<script>
+    let selectedSlot = null;
+    let isVerified = false;
+    const errSound = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    const successSound = new Audio("https://actions.google.com/sounds/v1/notifications/positive_notification.ogg");
+
+    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
+
+    document.getElementById("date").valueAsDate = new Date();
+
+    async function sendOTPRequest() {
+        const name = document.getElementById("name").value;
+        const phone = document.getElementById("phone").value;
+        if(!name || phone.length < 10) return alert("Enter Name and 10-digit Phone!");
+        alert("OTP Sent! Use: 123456");
+        document.getElementById("otpContainer").style.display = "block";
+        document.getElementById("verifyBtn").style.display = "none";
+    }
+
+    async function confirmOTP() {
+        const otp = document.getElementById("otpInput").value;
+        const res = await fetch("http://localhost:5000/verify-otp", {
+            method: "POST", headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ otp })
+        });
+        if(res.ok) {
+            isVerified = true;
+            successSound.play();
+            document.getElementById("otpContainer").style.display = "none";
+            document.getElementById("bookBtn").disabled = false;
+        } else {
+            errSound.play();
+            alert("Invalid OTP!");
+        }
+    }
+
+    async function loadSlots() {
+        const dateStr = document.getElementById("date").value;
+        const res = await fetch("http://localhost:5000/bookings");
+        const data = await res.json();
+        const grid = document.getElementById("slots");
+        grid.innerHTML = "";
+        const now = new Date();
+        const todayStr = now.toISOString().split("T")[0];
+        const isToday = dateStr === todayStr;
+
+        for(let h=0; h<24; h++) {
+            const s = document.createElement("div");
+            s.className = "slot";
+            s.innerText = fmt(h);
+            if(isToday && h <= now.getHours()) s.classList.add("past");
+            else if(data.find(b => b.date === dateStr && h >= b.startHour && h < b.startHour + b.duration)) s.classList.add("booked");
+            if(selectedSlot === h) s.classList.add("selected");
+            s.onclick = () => { if(!s.classList.contains("booked") && !s.classList.contains("past")) { selectedSlot = h; highlight(); calcPrice(); }};
+            grid.appendChild(s);
+        }
+        highlight();
+    }
+
+    function highlight() {
+        const slots = document.querySelectorAll(".slot");
+        const dur = parseInt(document.getElementById("dur").value);
+        slots.forEach(s => s.classList.remove("selected", "preview"));
+        if(selectedSlot === null) return;
+        for(let i=0; i<dur; i++){
+            let h = selectedSlot + i;
+            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) slots[h].classList.add(i === 0 ? "selected" : "preview");
+        }
+    }
+
+    async function calcPrice() {
+        if(selectedSlot === null) return;
+        const res = await fetch("http://localhost:5000/current-price");
+        const p = await res.json();
+        const dur = parseInt(document.getElementById("dur").value);
+        let total = 0;
+        for(let i=0; i<dur; i++){
+            let h = (selectedSlot + i) % 24;
+            total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
+        }
+        document.getElementById("priceBox").innerText = "₹" + total;
+    }
+
+    async function bookNow() {
+        if(!isVerified) return alert("Verify your phone first!");
+        const body = {
+            name: document.getElementById("name").value,
+            phone: document.getElementById("phone").value,
+            date: document.getElementById("date").value,
+            startHour: selectedSlot,
+            duration: parseInt(document.getElementById("dur").value),
+            sport: "Online"
+        };
+        const res = await fetch("http://localhost:5000/book", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(body)
+        });
+        if(res.ok) {
+            successSound.play();
+            document.getElementById("mainContainer").style.display = "none";
+            document.getElementById("thankYouScreen").style.display = "flex";
+        } else {
+            errSound.play();
+            const data = await res.json();
+            alert(data.message);
+        }
+    }
+
+    function returnToPage() {
+        // Reset everything
+        selectedSlot = null;
+        isVerified = false;
+        document.getElementById("name").value = "";
+        document.getElementById("phone").value = "";
+        document.getElementById("otpInput").value = "";
+        document.getElementById("bookBtn").disabled = true;
+        document.getElementById("verifyBtn").style.display = "block";
+        document.getElementById("priceBox").innerText = "₹0";
+        document.getElementById("mainContainer").style.display = "grid";
+        document.getElementById("thankYouScreen").style.display = "none";
+        loadSlots();
+    }
+
+    setInterval(() => { if(document.getElementById("mainContainer").style.display !== "none") loadSlots(); }, 3000);
+    loadSlots();
+</script>
+</body>
+</html>
