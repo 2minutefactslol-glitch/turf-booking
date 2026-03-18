@@ -18,7 +18,6 @@ const Booking = mongoose.model("Booking", new mongoose.Schema({
     name: String, phone: String, sport: String, date: String,
     startHour: Number, duration: Number, players: Number, totalPrice: Number
 }));
-
 const Price = mongoose.model("Price", new mongoose.Schema({ dayPrice: Number, nightPrice: Number }));
 const Setting = mongoose.model("Setting", new mongoose.Schema({ bookingPaused: Boolean }));
 
@@ -32,6 +31,8 @@ async function init() {
 init();
 
 /* --- AUTHENTICATION ROUTES --- */
+
+// 1. Admin Login (Manual)
 app.post("/admin-login", (req, res) => {
     const { username, password } = req.body;
     if (username === "Jadalzamana" && password === "Ayasher123") {
@@ -41,22 +42,25 @@ app.post("/admin-login", (req, res) => {
     }
 });
 
+// 2. Customer OTP Verification (Demo: 123456)
+app.post("/verify-otp", (req, res) => {
+    // Ensure the incoming OTP is checked as a string "123456"
+    if (String(req.body.otp) === "123456") {
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+});
+
 /* --- BOOKING & PRICING ROUTES --- */
+
 app.post("/book", async (req, res) => {
     const { date, startHour, duration } = req.body;
-    
-    // --- DATE VALIDATION LOGIC ---
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    // Block past dates
-    if (date < todayStr) {
-        return res.status(400).json({ message: "Cannot book a past date." });
-    }
-    // Block past hours for today
-    if (date === todayStr && startHour <= now.getHours()) {
-        return res.status(400).json({ message: "Cannot book a past time slot." });
-    }
+    if (date < todayStr) return res.status(400).json({ message: "Cannot book a past date." });
+    if (date === todayStr && startHour <= now.getHours()) return res.status(400).json({ message: "Cannot book a past slot." });
 
     const s = await Setting.findOne();
     if (s.bookingPaused) return res.status(403).json({ message: "Bookings are paused." });
@@ -71,26 +75,15 @@ app.post("/book", async (req, res) => {
 
 app.get("/bookings", async (req, res) => res.json(await Booking.find()));
 app.delete("/booking/:id", async (req, res) => { 
-    await Booking.findByIdAndDelete(req.params.id); 
-    res.json({ message: "Deleted" }); 
+    await Booking.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted" });
 });
-
 app.get("/current-price", async (req, res) => res.json(await Price.findOne()));
-
 app.post("/set-price", async (req, res) => {
-    try {
-        await Price.updateOne({}, { 
-            dayPrice: Number(req.body.dayPrice), 
-            nightPrice: Number(req.body.nightPrice) 
-        });
-        res.json({ message: "Prices Updated" });
-    } catch (e) {
-        res.status(500).json({ message: "Failed to update prices" });
-    }
+    await Price.updateOne({}, { dayPrice: Number(req.body.dayPrice), nightPrice: Number(req.body.nightPrice) });
+    res.json({ message: "Prices Updated" });
 });
-
 app.get("/booking-status", async (req, res) => res.json({ paused: (await Setting.findOne()).bookingPaused }));
-
 app.post("/toggle-booking", async (req, res) => {
     await Setting.updateOne({}, { bookingPaused: req.body.status });
     res.json({ message: "Status Updated" });
