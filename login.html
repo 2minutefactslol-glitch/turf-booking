@@ -5,72 +5,39 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 350px; text-align: center; }
-        h2 { color: #1e3c72; margin-bottom: 30px; }
+        h2 { color: #1e3c72; margin-bottom: 20px; }
         input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #eee; border-radius: 10px; box-sizing: border-box; transition: 0.3s; }
-        input:focus { border-color: #1e3c72; outline: none; }
-        button { width: 100%; padding: 12px; background: #1e3c72; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.3s; }
-        button:hover { background: #2a5298; transform: translateY(-2px); }
-        .demo-otp { font-size: 12px; color: #888; margin-top: 15px; }
+        button { width: 100%; padding: 12px; background: #1e3c72; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .admin-link { margin-top: 15px; display: block; color: #666; cursor: pointer; font-size: 14px; text-decoration: underline; }
     </style>
 </head>
 <body>
 <div class="card">
-    <h2>Welcome to TurfPro</h2>
-    <input id="phone" type="tel" placeholder="Mobile Number">
-    <button onclick="sendOTP()">Send OTP</button>
-    <div id="otpSection" style="display:none; margin-top: 20px;">
-        <input id="otp" type="number" placeholder="Enter 6-digit OTP">
-        <button onclick="verifyOTP()" style="background: #22c55e;">Verify & Login</button>
-    </div>
-    <p class="demo-otp">Testing? Use OTP: 123456</p>
+    <h2>Admin Login</h2>
+    <input id="adminUser" type="text" placeholder="Username">
+    <input id="adminPass" type="password" placeholder="Password">
+    <button onclick="adminLogin()">Login to Dashboard</button>
+    <a href="index.html" class="admin-link">Back to Booking Page</a>
 </div>
+
 <script>
-    // ⬇️ UPDATED TO YOUR LIVE RENDER URL ⬇️
     const BASE_URL = "https://turf-booking-natl.onrender.com";
 
-    let phoneNum = "";
+    async function adminLogin() {
+        const username = document.getElementById("adminUser").value;
+        const password = document.getElementById("adminPass").value;
 
-    async function sendOTP() {
-        phoneNum = document.getElementById("phone").value;
-        if(phoneNum.length < 10) return alert("Valid phone required");
-        
-        try {
-            const res = await fetch(`${BASE_URL}/send-otp`, { 
-                method: "POST", 
-                headers:{"Content-Type":"application/json"}, 
-                body: JSON.stringify({phone: phoneNum}) 
-            });
-            
-            if(res.ok) {
-                document.getElementById("otpSection").style.display = "block";
-                alert("OTP Sent! (Demo: 123456)");
-            } else {
-                alert("Server Error. Please try again.");
-            }
-        } catch (e) {
-            alert("Cannot reach server. Make sure Render is live!");
-        }
-    }
+        const res = await fetch(`${BASE_URL}/admin-login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
 
-    async function verifyOTP() {
-        const otp = document.getElementById("otp").value;
-        try {
-            const res = await fetch(`${BASE_URL}/verify-otp`, { 
-                method: "POST", 
-                headers:{"Content-Type":"application/json"}, 
-                body: JSON.stringify({otp}) 
-            });
-            
-            if(res.ok) {
-                localStorage.setItem("loggedIn", "true");
-                localStorage.setItem("userPhone", phoneNum);
-                // Redirect to your GitHub Pages main booking site
-                window.location = "index.html";
-            } else {
-                alert("Invalid OTP");
-            }
-        } catch (e) {
-            alert("Verification failed. Check your connection.");
+        if (res.ok) {
+            localStorage.setItem("adminLoggedIn", "true");
+            window.location = "admin.html";
+        } else {
+            alert("Invalid Username or Password!");
         }
     }
 </script>
