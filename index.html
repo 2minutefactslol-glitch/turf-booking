@@ -1,11 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro | Book Now</title>
+    <title>TurfPro | Live Booking</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:10px; }
         .card{ background:white; padding:20px; border-radius:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1); margin:auto; max-width:800px; }
+        
+        /* Status Banner */
+        #statusBanner { display: none; background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; border: 1px solid #fecaca; }
+        
         input{ width:100%; padding:12px; margin:10px 0; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
         .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin:15px 0; }
         .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; }
@@ -13,34 +17,50 @@
         .past{ background:#e2e8f0; color:#94a3b8; cursor:not-allowed; }
         .selected{ background:#1e3c72 !important; border:2px solid #000; }
         .preview{ background:#f59e0b !important; }
-        .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
+        
+        .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; transition: 0.3s; }
         .btn:disabled{ background:#cbd5e1 !important; color:#94a3b8; cursor:not-allowed; }
+        .btn-paused { background: #ef4444 !important; }
     </style>
 </head>
 <body>
+
 <div class="card">
-    <h2 style="color:#1e3c72; text-align:center;">🏟️ TurfPro Booking</h2>
+    <h2 style="color:#1e3c72; text-align:center; margin-bottom:5px;">🏟️ TurfPro Booking</h2>
+    
+    <div id="statusBanner">⚠️ ONLINE BOOKINGS TEMPORARILY PAUSED</div>
+
     <input id="name" placeholder="Full Name">
     <input id="phone" type="tel" maxlength="10" placeholder="10-digit Phone">
     
-    <div id="otpBox" style="display:none; border:1px dashed #1e3c72; padding:10px; border-radius:10px;">
+    <div id="otpBox" style="display:none; border:1px dashed #1e3c72; padding:10px; border-radius:10px; margin-bottom:10px;">
         <input id="otpIn" type="tel" placeholder="Enter OTP (123456)">
         <button class="btn" style="background:#1e3c72" onclick="verifyOTP()">Verify OTP</button>
     </div>
     <button id="vBtn" class="btn" style="background:#1e3c72" onclick="sendOTP()">Verify Phone to Book</button>
 
-    <input id="date" type="date" onchange="loadSlots()">
-    <input id="dur" type="number" value="1" min="1" max="6" onchange="highlight(); calcPrice();">
-    <h1 id="price" style="text-align:center; color:#1e3c72;">₹0</h1>
+    <div style="margin-top:15px;">
+        <label style="font-size:0.8rem; font-weight:bold; color:#64748b;">Select Date (Max 7 Days)</label>
+        <input id="date" type="date" onchange="loadSlots()">
+    </div>
+    
+    <div style="margin-top:5px;">
+        <label style="font-size:0.8rem; font-weight:bold; color:#64748b;">Duration (Hours)</label>
+        <input id="dur" type="number" value="1" min="1" max="6" onchange="highlight(); calcPrice();">
+    </div>
+
+    <h1 id="price" style="text-align:center; color:#1e3c72; margin:10px 0;">₹0</h1>
+    
     <div id="slots" class="grid"></div>
+    
     <button id="bookBtn" class="btn" onclick="bookNow()" disabled>Book Now</button>
 </div>
 
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
-    let selectedSlot = null; let isVerified = false;
+    let selectedSlot = null; let isVerified = false; let systemPaused = false;
 
-    // --- 7 DAY LIMIT ---
+    // --- 7 DAY LIMIT LOGIC ---
     const dt = document.getElementById("date");
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -52,36 +72,43 @@
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
 
     async function sendOTP() {
-        if(phone.value.length < 10) return alert("Enter valid phone!");
+        if(phone.value.length < 10) return alert("Enter valid 10-digit phone!");
         otpBox.style.display="block"; vBtn.style.display="none";
-        alert("Use Demo OTP: 123456");
+        alert("Demo OTP: 123456");
     }
 
     async function verifyOTP() {
         const res = await fetch(`${BASE_URL}/verify-otp`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({otp: otpIn.value}) });
-        if(res.ok) { isVerified = true; otpBox.style.display="none"; alert("Verified!"); checkSystemStatus(); }
-        else alert("Wrong OTP");
+        if(res.ok) { 
+            isVerified = true; 
+            otpBox.style.display="none"; 
+            alert("Verified!"); 
+            checkSystemStatus(); 
+        } else alert("Wrong OTP");
     }
 
     async function loadSlots() {
-        const res = await fetch(`${BASE_URL}/bookings`);
-        const data = await res.json();
-        const grid = document.getElementById("slots"); grid.innerHTML = "";
-        const curH = new Date().getHours();
-        const isToday = dt.value === todayStr;
+        try {
+            const res = await fetch(`${BASE_URL}/bookings`);
+            const data = await res.json();
+            const grid = document.getElementById("slots"); grid.innerHTML = "";
+            const curH = new Date().getHours();
+            const isToday = dt.value === todayStr;
 
-        for(let h=0; h<24; h++) {
-            const s = document.createElement("div"); s.className = "slot"; s.innerText = fmt(h);
-            const isPast = isToday && h <= curH;
-            const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
-            if(isPast) s.classList.add("past");
-            else if(isBooked) s.classList.add("booked");
-            else {
-                if(selectedSlot === h) s.classList.add("selected");
-                s.onclick = () => { selectedSlot = h; highlight(); calcPrice(); };
+            for(let h=0; h<24; h++) {
+                const s = document.createElement("div"); s.className = "slot"; s.innerText = fmt(h);
+                const isPast = isToday && h <= curH;
+                const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
+                
+                if(isPast) s.classList.add("past");
+                else if(isBooked) s.classList.add("booked");
+                else {
+                    if(selectedSlot === h) s.classList.add("selected");
+                    s.onclick = () => { if(!systemPaused) { selectedSlot = h; highlight(); calcPrice(); } };
+                }
+                grid.appendChild(s);
             }
-            grid.appendChild(s);
-        }
+        } catch(e) { console.log("Sync failed"); }
     }
 
     function highlight() {
@@ -106,21 +133,50 @@
         document.getElementById("price").innerText = "₹" + total;
     }
 
+    // --- LIVE SYSTEM STATUS SYNC ---
     async function checkSystemStatus() {
-        const res = await fetch(`${BASE_URL}/booking-status`);
-        const s = await res.json();
-        const bBtn = document.getElementById("bookBtn");
-        if(s.paused) { bBtn.disabled = true; bBtn.innerText = "Paused by Admin"; bBtn.style.background="#ef4444"; }
-        else { if(isVerified) { bBtn.disabled = false; bBtn.innerText = "Book Now"; bBtn.style.background="#22c55e"; } }
+        try {
+            const res = await fetch(`${BASE_URL}/booking-status`);
+            const s = await res.json();
+            const bBtn = document.getElementById("bookBtn");
+            const banner = document.getElementById("statusBanner");
+            
+            systemPaused = s.paused;
+
+            if(s.paused) {
+                bBtn.disabled = true;
+                bBtn.innerText = "System Paused";
+                bBtn.classList.add("btn-paused");
+                banner.style.display = "block";
+                // De-select any slots if they were chosen
+                selectedSlot = null;
+                highlight();
+            } else {
+                banner.style.display = "none";
+                bBtn.classList.remove("btn-paused");
+                if(isVerified) { 
+                    bBtn.disabled = false; 
+                    bBtn.innerText = "Book Now"; 
+                } else {
+                    bBtn.innerText = "Verify Phone to Book";
+                }
+            }
+        } catch (e) { console.error("Status Sync Error"); }
     }
 
     async function bookNow() {
+        if(systemPaused) return alert("System is paused. Cannot book.");
         const body = { name: name.value, phone: phone.value, date: dt.value, startHour: selectedSlot, duration: parseInt(dur.value), sport: "Online" };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { alert("Booked!"); location.reload(); } else alert((await res.json()).message);
+        if(res.ok) { alert("Booked Successfully!"); location.reload(); } 
+        else alert((await res.json()).message);
     }
 
-    setInterval(() => { loadSlots(); checkSystemStatus(); }, 4000);
+    // High frequency sync for status, lower for slots
+    setInterval(checkSystemStatus, 3000); 
+    setInterval(loadSlots, 5000);
+    
+    checkSystemStatus();
     loadSlots();
 </script>
 </body>
