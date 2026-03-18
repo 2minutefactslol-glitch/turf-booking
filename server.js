@@ -5,7 +5,7 @@ const app = express();
 app.use(cors()); app.use(express.json());
 
 const DB_URI = "mongodb://Admin:Nihalreddy123@ac-ktmpoty-shard-00-00.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-01.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-02.d0nniyi.mongodb.net:27017/turf?ssl=true&replicaSet=atlas-14f8at-shard-0&authSource=admin&retryWrites=true&w=majority";
-mongoose.connect(DB_URI).then(() => console.log("✅ DB Connected"));
+mongoose.connect(DB_URI).then(() => console.log("✅ MongoDB Connected"));
 
 const Booking = mongoose.model("Booking", new mongoose.Schema({
     name: String, phone: String, date: String, startHour: Number, duration: Number, sport: String
@@ -33,25 +33,35 @@ app.post("/verify-otp", (req, res) => {
 
 app.post("/book", async (req, res) => {
     const { date, startHour, duration } = req.body;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    const maxDate = new Date();
+    maxDate.setDate(now.getDate() + 7);
+    const maxDateStr = maxDate.toISOString().split('T')[0];
+
+    if (date < todayStr) return res.status(400).json({ message: "Cannot book past dates." });
+    if (date > maxDateStr) return res.status(400).json({ message: "Booking allowed only for 7 days ahead." });
+    if (date === todayStr && startHour <= now.getHours()) return res.status(400).json({ message: "Time already passed." });
+
+    const s = await Setting.findOne();
+    if (s.bookingPaused) return res.status(403).json({ message: "Bookings are currently paused." });
+
     const existing = await Booking.find({ date });
     const isOverlap = existing.some(b => (startHour < (b.startHour + b.duration) && (startHour + duration) > b.startHour));
     if (isOverlap) return res.status(400).json({ message: "Slot already taken!" });
+
     await new Booking(req.body).save();
     res.json({ message: "Success" });
 });
 
-app.get("/bookings", async (req, res) => res.json(await Booking.find().sort({date: -1}).lean()));
-app.delete("/booking/:id", async (req, res) => { 
-    await Booking.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-});
-
+app.get("/bookings", async (req, res) => res.json(await Booking.find().sort({date: 1, startHour: 1}).lean()));
+app.delete("/booking/:id", async (req, res) => { await Booking.findByIdAndDelete(req.params.id); res.json({ success: true }); });
 app.get("/current-price", async (req, res) => res.json(await Price.findOne()));
 app.post("/set-price", async (req, res) => {
     await Price.updateOne({}, { dayPrice: Number(req.body.dayPrice), nightPrice: Number(req.body.nightPrice) });
     res.json({ message: "Updated" });
 });
-
 app.get("/booking-status", async (req, res) => res.json({ paused: (await Setting.findOne()).bookingPaused }));
 app.post("/toggle-booking", async (req, res) => {
     await Setting.updateOne({}, { bookingPaused: req.body.status });
@@ -73,4 +83,4 @@ app.get("/dashboard", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("🚀 Server Running"));
+app.listen(PORT, () => console.log("🚀 Server Live"));
