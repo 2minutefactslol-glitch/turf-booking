@@ -25,22 +25,53 @@
     <p class="demo-otp">Testing? Use OTP: 123456</p>
 </div>
 <script>
+    // ⬇️ UPDATED TO YOUR LIVE RENDER URL ⬇️
+    const BASE_URL = "https://turf-booking-natl.onrender.com";
+
     let phoneNum = "";
+
     async function sendOTP() {
         phoneNum = document.getElementById("phone").value;
         if(phoneNum.length < 10) return alert("Valid phone required");
-        await fetch("http://localhost:5000/send-otp", { method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({phone: phoneNum}) });
-        document.getElementById("otpSection").style.display = "block";
-        alert("OTP Sent!");
+        
+        try {
+            const res = await fetch(`${BASE_URL}/send-otp`, { 
+                method: "POST", 
+                headers:{"Content-Type":"application/json"}, 
+                body: JSON.stringify({phone: phoneNum}) 
+            });
+            
+            if(res.ok) {
+                document.getElementById("otpSection").style.display = "block";
+                alert("OTP Sent! (Demo: 123456)");
+            } else {
+                alert("Server Error. Please try again.");
+            }
+        } catch (e) {
+            alert("Cannot reach server. Make sure Render is live!");
+        }
     }
+
     async function verifyOTP() {
         const otp = document.getElementById("otp").value;
-        const res = await fetch("http://localhost:5000/verify-otp", { method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({otp}) });
-        if(res.ok) {
-            localStorage.setItem("loggedIn", "true");
-            localStorage.setItem("userPhone", phoneNum);
-            window.location = "index.html";
-        } else alert("Invalid OTP");
+        try {
+            const res = await fetch(`${BASE_URL}/verify-otp`, { 
+                method: "POST", 
+                headers:{"Content-Type":"application/json"}, 
+                body: JSON.stringify({otp}) 
+            });
+            
+            if(res.ok) {
+                localStorage.setItem("loggedIn", "true");
+                localStorage.setItem("userPhone", phoneNum);
+                // Redirect to your GitHub Pages main booking site
+                window.location = "index.html";
+            } else {
+                alert("Invalid OTP");
+            }
+        } catch (e) {
+            alert("Verification failed. Check your connection.");
+        }
     }
 </script>
 </body>
