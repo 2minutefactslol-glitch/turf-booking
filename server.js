@@ -33,7 +33,6 @@ init();
 
 /* --- AUTHENTICATION ROUTES --- */
 
-// Admin Login Route
 app.post("/admin-login", (req, res) => {
     const { username, password } = req.body;
     if (username === "Jadalzamana" && password === "Ayasher123") {
@@ -48,7 +47,7 @@ app.post("/verify-otp", (req, res) => {
     else res.status(400).json({ success: false });
 });
 
-/* --- BOOKING ROUTES --- */
+/* --- BOOKING & PRICING ROUTES --- */
 
 app.post("/book", async (req, res) => {
     const { date, startHour, duration } = req.body;
@@ -70,6 +69,19 @@ app.delete("/booking/:id", async (req, res) => {
 });
 
 app.get("/current-price", async (req, res) => res.json(await Price.findOne()));
+
+app.post("/set-price", async (req, res) => {
+    try {
+        await Price.updateOne({}, { 
+            dayPrice: Number(req.body.dayPrice), 
+            nightPrice: Number(req.body.nightPrice) 
+        });
+        res.json({ message: "Prices Updated" });
+    } catch (e) {
+        res.status(500).json({ message: "Failed to update prices" });
+    }
+});
+
 app.get("/booking-status", async (req, res) => res.json({ paused: (await Setting.findOne()).bookingPaused }));
 
 app.post("/toggle-booking", async (req, res) => {
