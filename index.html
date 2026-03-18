@@ -1,107 +1,154 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro | Mobile Optimized</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <style>
-        body{ font-family: sans-serif; background:#f1f5f9; padding:10px; }
-        .card{ background:white; padding:20px; border-radius:15px; margin-bottom:20px; }
-        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap:8px; }
-        .slot{ padding:12px; background:#22c55e; color:white; border-radius:8px; text-align:center; font-weight:bold; }
-        .booked{ background:#fee2e2; color:#ef4444; }
-        .past{ background:#e2e8f0; color:#94a3b8; cursor:not-allowed; } /* FIXED LOGIC */
-        .selected{ background:#1e3c72 !important; border:2px solid black; }
-        .preview{ background:orange !important; } /* ORANGE PREVIEW FIX */
-        input{ width:100%; padding:12px; margin:10px 0; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
-        .btn{ width:100%; padding:15px; background:#1e3c72; color:white; border:none; border-radius:10px; font-weight:bold; }
+    <title>TurfPro | Book Your Slot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f1f5f9; margin:0; padding:10px; }
+        .container{ max-width:1000px; margin:auto; display:grid; grid-template-columns: 1fr; gap:20px; }
+        @media(min-width: 768px) { .container { grid-template-columns: 350px 1fr; padding: 20px; } }
+        
+        .card{ background:white; padding:20px; border-radius:15px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); }
+        h3 { color: #1e3c72; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+        
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; color: #64748b; }
+        input { width:100%; padding:12px; margin:8px 0; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size: 1rem; }
+        
+        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin-top: 10px; }
+        .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; transition: 0.2s; border: 2px solid transparent; }
+        .booked{ background:#fee2e2; color:#ef4444; cursor:not-allowed; }
+        .past{ background:#e2e8f0; color:#94a3b8; cursor:not-allowed; }
+        .selected{ background:#1e3c72 !important; border-color: #0f172a; transform: scale(1.05); }
+        .preview{ background:#f59e0b !important; }
+        
+        .btn{ width:100%; padding:15px; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem; transition: 0.3s; }
+        .btn-verify{ background:#1e3c72; color:white; margin-bottom: 10px; }
+        .btn-book{ background:#22c55e; color:white; margin-top: 10px; }
+        .btn:disabled{ background:#cbd5e1; cursor:not-allowed; color: #94a3b8; }
+        
+        #priceDisplay { font-size: 2rem; font-weight: bold; color: #1e3c72; text-align: center; margin: 15px 0; }
+        .otp-section { display:none; background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px dashed #1e3c72; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h3>Book Turf</h3>
-    <input id="name" placeholder="Name">
-    <input id="phone" type="tel" placeholder="Phone">
-    <input id="otp" type="tel" inputmode="numeric" placeholder="OTP (123456)" style="display:none">
-    <button id="vBtn" class="btn" onclick="sendOTP()">Verify Phone</button>
-    <button id="cBtn" class="btn" onclick="confirmOTP()" style="display:none; background:#22c55e;">Confirm OTP</button>
-    
-    <label>Date</label>
-    <input id="date" type="date" onchange="loadSlots()">
-    <label>Duration (Hrs)</label>
-    <input id="dur" type="number" value="1" min="1" onchange="highlight()">
-    <h2 id="price">₹0</h2>
-    <button id="bookBtn" class="btn" onclick="book()" disabled>Book Now</button>
-</div>
+<div class="container">
+    <aside class="card">
+        <h3>Booking Details</h3>
+        
+        <label>Full Name</label>
+        <input id="name" type="text" placeholder="Enter your name">
+        
+        <label>Phone Number</label>
+        <input id="phone" type="tel" maxlength="10" placeholder="10-digit mobile">
 
-<div class="card"><div id="slots" class="grid"></div></div>
+        <div id="otpBox" class="otp-section">
+            <label>Verify OTP (Use: 123456)</label>
+            <input id="otpInput" type="tel" inputmode="numeric" maxlength="6" placeholder="Enter 6-digit OTP">
+            <button class="btn btn-book" onclick="confirmOTP()">Verify & Unlock</button>
+        </div>
+        <button id="vBtn" class="btn btn-verify" onclick="requestOTP()">Verify Phone to Book</button>
+
+        <label>Select Date</label>
+        <input id="date" type="date" onchange="loadSlots()">
+        
+        <label>Duration (Hours)</label>
+        <input id="dur" type="number" value="1" min="1" max="12" onchange="highlight(); calcPrice();">
+
+        <div id="priceDisplay">₹0</div>
+        
+        <button id="bookBtn" class="btn btn-book" onclick="bookNow()" disabled>Confirm Booking</button>
+    </aside>
+
+    <main class="card">
+        <h3>Available Slots</h3>
+        <p style="font-size: 0.8rem; color: #64748b;">Green = Available | Red = Booked | Grey = Past</p>
+        <div id="slots" class="grid"></div>
+    </main>
+</div>
 
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     let selectedSlot = null;
     let isVerified = false;
 
-    // FIX: Lock dates before today
+    // 1. Initial Setup: Lock Past Dates
     const today = new Date().toISOString().split('T')[0];
     document.getElementById("date").setAttribute('min', today);
     document.getElementById("date").value = today;
 
-    async function sendOTP() {
-        alert("OTP Sent: 123456");
-        document.getElementById("otp").style.display = "block";
-        document.getElementById("cBtn").style.display = "block";
+    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
+
+    // 2. OTP Verification
+    async function requestOTP() {
+        const p = document.getElementById("phone").value;
+        if(p.length < 10) return alert("Please enter a valid 10-digit number!");
+        
+        alert("Verification code sent to " + p + " (Demo: 123456)");
+        document.getElementById("otpBox").style.display = "block";
         document.getElementById("vBtn").style.display = "none";
     }
 
     async function confirmOTP() {
+        const otp = document.getElementById("otpInput").value.trim();
         const res = await fetch(`${BASE_URL}/verify-otp`, {
-            method: "POST", headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({ otp: document.getElementById("otp").value })
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ otp })
         });
+
         if(res.ok) {
             isVerified = true;
+            document.getElementById("otpBox").style.display = "none";
             document.getElementById("bookBtn").disabled = false;
-            document.getElementById("otp").style.display = "none";
-            document.getElementById("cBtn").style.display = "none";
-            alert("Verified!");
-        } else alert("Invalid OTP");
+            alert("Phone Verified! You can now book.");
+        } else {
+            alert("Invalid OTP! Use 123456 for demo.");
+        }
     }
 
+    // 3. Load Slots from Server
     async function loadSlots() {
-        const dateStr = document.getElementById("date").value;
+        const dateInput = document.getElementById("date").value;
         const res = await fetch(`${BASE_URL}/bookings`);
-        const data = await res.json();
+        const bookings = await res.json();
+        
         const grid = document.getElementById("slots");
         grid.innerHTML = "";
-        
+
         const now = new Date();
-        const isToday = dateStr === now.toISOString().split("T")[0];
-        const curH = now.getHours();
+        const todayStr = now.toISOString().split("T")[0];
+        const currentHour = now.getHours();
 
         for(let h=0; h<24; h++) {
             const s = document.createElement("div");
             s.className = "slot";
-            s.innerText = (h%12||12) + (h>=12?"PM":"AM");
-            
-            // FIX: Disable past slots
-            const isPast = isToday && h <= curH;
-            const isBooked = data.find(b => b.date === dateStr && h >= b.startHour && h < b.startHour + b.duration);
+            s.innerText = fmt(h);
 
-            if(isPast) s.classList.add("past");
-            else if(isBooked) s.classList.add("booked");
-            
-            if(selectedSlot === h) s.classList.add("selected");
-            
-            s.onclick = () => { if(!isPast && !isBooked) { selectedSlot = h; highlight(); } };
+            const isPast = (dateInput === todayStr && h <= currentHour);
+            const isBooked = bookings.find(b => b.date === dateInput && h >= b.startHour && h < (b.startHour + b.duration));
+
+            if(isPast) {
+                s.classList.add("past");
+            } else if(isBooked) {
+                s.classList.add("booked");
+            } else {
+                if(selectedSlot === h) s.classList.add("selected");
+                s.onclick = () => { selectedSlot = h; highlight(); calcPrice(); };
+            }
             grid.appendChild(s);
         }
+        highlight();
     }
 
+    // 4. Highlight Selection & Duration
     function highlight() {
         const slots = document.querySelectorAll(".slot");
         const dur = parseInt(document.getElementById("dur").value);
         slots.forEach(s => s.classList.remove("selected", "preview"));
-        if(selectedSlot === null) return;
         
+        if(selectedSlot === null) return;
+
         for(let i=0; i<dur; i++) {
             let h = selectedSlot + i;
             if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
@@ -110,12 +157,51 @@
         }
     }
 
-    async function book() {
-        const body = { name: name.value, phone: phone.value, date: date.value, startHour: selectedSlot, duration: dur.value };
-        const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { alert("Booked!"); location.reload(); }
+    // 5. Calculate Price Live
+    async function calcPrice() {
+        if(selectedSlot === null) return;
+        const res = await fetch(`${BASE_URL}/current-price`);
+        const p = await res.json();
+        const dur = parseInt(document.getElementById("dur").value);
+        
+        let total = 0;
+        for(let i=0; i<dur; i++) {
+            let h = (selectedSlot + i) % 24;
+            total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
+        }
+        document.getElementById("priceDisplay").innerText = "₹" + total;
     }
 
+    // 6. Final Booking Request
+    async function bookNow() {
+        if(!selectedSlot === null) return alert("Please select a time slot!");
+        
+        const body = {
+            name: document.getElementById("name").value, // Matches Admin "name"
+            phone: document.getElementById("phone").value, // Matches Admin "phone"
+            date: document.getElementById("date").value,
+            startHour: selectedSlot,
+            duration: parseInt(document.getElementById("dur").value),
+            sport: "Online"
+        };
+
+        const res = await fetch(`${BASE_URL}/book`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(body)
+        });
+
+        if(res.ok) {
+            alert("Booking Successful! See you at the turf.");
+            location.reload();
+        } else {
+            const err = await res.json();
+            alert("Error: " + err.message);
+        }
+    }
+
+    // Sync with server every 5 seconds to show new bookings
+    setInterval(loadSlots, 5000);
     loadSlots();
 </script>
 </body>
