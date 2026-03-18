@@ -8,15 +8,19 @@
         .card{ background:white; padding:25px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin:auto; max-width:500px; }
         h2{ color:#1e3c72; text-align:center; margin-bottom:20px; }
         input{ width:100%; padding:12px; margin:10px 0; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:1rem; }
-        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin:20px 0; }
-        .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; transition: 0.2s; }
+        
+        /* THE GRID SECTION - RESTORED */
+        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin:20px 0; min-height: 100px; }
+        .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; transition: 0.2s; border: 2px solid transparent; }
+        
         .booked{ background:#fee2e2 !important; color:#ef4444 !important; cursor:not-allowed; }
         .past{ background:#e2e8f0 !important; color:#94a3b8 !important; cursor:not-allowed; pointer-events:none; }
         .selected{ background:#1e3c72 !important; border:2px solid #000; transform: scale(1.05); }
         .preview{ background:#f59e0b !important; }
+        
         .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
         .btn:disabled{ background:#cbd5e1 !important; color:#94a3b8; }
-        #statusBanner { display:none; background:#fee2e2; color:#ef4444; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #fecaca; }
+        #statusBanner { display:none; background:#fee2e2; color:#ef4444; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border: 1px solid #fecaca; }
     </style>
 </head>
 <body>
@@ -38,9 +42,10 @@
     <input id="date" type="date" onchange="loadSlots()">
     
     <label style="font-size:0.8rem; color:#64748b; font-weight:bold;">Duration (Hours)</label>
-    <input id="dur" type="number" value="1" min="1" max="6" onchange="highlight(); calcPrice();">
+    <input id="dur" type="number" value="1" min="1" max="6" oninput="highlight(); calcPrice();">
 
     <h1 id="price" style="text-align:center; color:#1e3c72; margin:15px 0;">₹0</h1>
+    
     <div id="slots" class="grid"></div>
     
     <button id="bookBtn" class="btn" onclick="bookNow()" disabled>Confirm Booking</button>
@@ -51,7 +56,8 @@
     let selectedSlot = null; let isVerified = false; let systemPaused = false;
 
     // Timezone & Date Lock (IST)
-    const localToday = new Date().toLocaleDateString('en-CA');
+    const now = new Date();
+    const localToday = now.toLocaleDateString('en-CA');
     const dt = document.getElementById("date");
     dt.setAttribute('min', localToday);
     const max = new Date(); max.setDate(now.getDate() + 7);
@@ -67,35 +73,44 @@
     }
 
     async function loadSlots() {
-        const res = await fetch(`${BASE_URL}/bookings`);
-        const data = await res.json();
-        const grid = document.getElementById("slots"); grid.innerHTML = "";
-        const curH = new Date().getHours();
-        const isToday = dt.value === localToday;
-
-        for(let h=0; h<24; h++) {
-            const s = document.createElement("div"); s.className = "slot"; s.innerText = fmt(h);
-            const isPast = isToday && h <= curH;
-            const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
+        try {
+            const res = await fetch(`${BASE_URL}/bookings`);
+            const data = await res.json();
+            const grid = document.getElementById("slots"); 
+            grid.innerHTML = "";
             
-            if(isPast) s.classList.add("past");
-            else if(isBooked) s.classList.add("booked");
-            else {
-                if(selectedSlot === h) s.classList.add("selected");
-                s.onclick = () => { if(!systemPaused) { selectedSlot = h; highlight(); calcPrice(); } };
+            const curH = new Date().getHours();
+            const isToday = dt.value === localToday;
+
+            for(let h=0; h<24; h++) {
+                const s = document.createElement("div"); 
+                s.className = "slot"; 
+                s.innerText = fmt(h);
+                
+                const isPast = isToday && h <= curH;
+                const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
+                
+                if(isPast) s.classList.add("past");
+                else if(isBooked) s.classList.add("booked");
+                else {
+                    if(selectedSlot === h) s.classList.add("selected");
+                    s.onclick = () => { if(!systemPaused) { selectedSlot = h; highlight(); calcPrice(); } };
+                }
+                grid.appendChild(s);
             }
-            grid.appendChild(s);
-        }
-        highlight();
+            highlight(); // Ensure highlights remain after grid refresh
+        } catch(e) { console.error("Grid load failed"); }
     }
 
     function highlight() {
         const slots = document.querySelectorAll(".slot");
-        const dr = parseInt(dur.value);
+        const dr = parseInt(dur.value) || 1;
         slots.forEach(s => s.classList.remove("selected", "preview"));
         if(selectedSlot === null) return;
+        
         for(let i=0; i<dr; i++){
             let h = selectedSlot + i;
+            // Highlight logic based on time slots (0-23)
             if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
                 slots[h].classList.add(i === 0 ? "selected" : "preview");
             }
@@ -106,7 +121,8 @@
         if(selectedSlot === null) return;
         const p = await (await fetch(`${BASE_URL}/current-price`)).json();
         let total = 0;
-        for(let i=0; i<parseInt(dur.value); i++) {
+        const dr = parseInt(dur.value) || 1;
+        for(let i=0; i<dr; i++) {
             let h = (selectedSlot + i) % 24;
             total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
         }
@@ -114,20 +130,34 @@
     }
 
     async function checkStatus() {
-        const s = await (await fetch(`${BASE_URL}/booking-status`)).json();
-        systemPaused = s.paused;
-        bookBtn.disabled = s.paused || !isVerified;
-        statusBanner.style.display = s.paused ? "block" : "none";
-        bookBtn.innerText = s.paused ? "System Paused" : (isVerified ? "Confirm Booking" : "Verify Phone to Book");
+        try {
+            const res = await fetch(`${BASE_URL}/booking-status`);
+            const s = await res.json();
+            systemPaused = s.paused;
+            const bBtn = document.getElementById("bookBtn");
+            const banner = document.getElementById("statusBanner");
+            
+            banner.style.display = s.paused ? "block" : "none";
+            bookBtn.disabled = s.paused || !isVerified;
+            bookBtn.innerText = s.paused ? "System Paused" : (isVerified ? "Confirm Booking" : "Verify Phone to Book");
+        } catch(e) {}
     }
 
     async function bookNow() {
-        const body = { name: userName.value, phone: userPhone.value, date: dt.value, startHour: selectedSlot, duration: parseInt(dur.value), sport: "Online" };
+        const body = { 
+            name: document.getElementById("userName").value, 
+            phone: document.getElementById("userPhone").value, 
+            date: dt.value, 
+            startHour: selectedSlot, 
+            duration: parseInt(dur.value), 
+            sport: "Online" 
+        };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
         if(res.ok) { alert("Booked!"); location.reload(); } else alert((await res.json()).message);
     }
 
-    setInterval(() => { checkStatus(); loadSlots(); }, 4000);
+    // Refresh every 5 seconds
+    setInterval(() => { checkStatus(); loadSlots(); }, 5000);
     loadSlots();
 </script>
 </body>
