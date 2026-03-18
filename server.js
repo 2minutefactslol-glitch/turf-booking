@@ -13,7 +13,6 @@ const Booking = mongoose.model("Booking", new mongoose.Schema({
 const Price = mongoose.model("Price", new mongoose.Schema({ dayPrice: Number, nightPrice: Number }));
 const Setting = mongoose.model("Setting", new mongoose.Schema({ bookingPaused: Boolean }));
 
-/* INITIALIZE DEFAULTS */
 async function init() {
     try {
         if (!await Price.findOne()) await Price.create({ dayPrice: 800, nightPrice: 1200 });
@@ -22,7 +21,6 @@ async function init() {
 }
 init();
 
-/* ROUTES */
 app.post("/admin-login", (req, res) => {
     if (req.body.username === "Jadalzamana" && req.body.password === "Ayasher123") res.json({ success: true });
     else res.status(401).json({ success: false });
@@ -35,9 +33,9 @@ app.post("/verify-otp", (req, res) => {
 
 app.post("/book", async (req, res) => {
     const { date, startHour, duration } = req.body;
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    if (date < todayStr || (date === todayStr && startHour <= now.getHours())) return res.status(400).json({ message: "Invalid Time" });
+    const existing = await Booking.find({ date });
+    const isOverlap = existing.some(b => (startHour < (b.startHour + b.duration) && (startHour + duration) > b.startHour));
+    if (isOverlap) return res.status(400).json({ message: "Slot already taken!" });
     await new Booking(req.body).save();
     res.json({ message: "Success" });
 });
