@@ -16,11 +16,13 @@
         button{ padding:10px 20px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
         .btn-pause{ background:#ef4444; } .btn-resume{ background:#22c55e; }
         .btn-logout{ background:rgba(255,255,255,0.2); border: 1px solid white; }
+        .btn-price{ background:#1e3c72; width: 100%; }
         .grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:15px; }
         .slot{ padding:15px; text-align:center; border-radius:8px; border:2px solid #e2e8f0; font-weight:bold; cursor:pointer; background:#22c55e; color:white; }
         .booked{ background:#ef4444; border-color:#ef4444; cursor:not-allowed; }
         .selected{ border:3px solid black !important; background: #1e3c72 !important; }
         .preview{ background:orange !important; }
+        .warning-box { background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
         table{ width:100%; border-collapse:collapse; }
         th,td{ border-bottom:1px solid #eee; padding:12px; text-align:center; }
     </style>
@@ -37,6 +39,24 @@
         <h3>System Control: <span id="statusTxt">---</span></h3>
         <button class="btn-pause" onclick="toggleSys(true)">Pause Bookings</button>
         <button class="btn-resume" onclick="toggleSys(false)">Resume Bookings</button>
+    </div>
+
+    <div class="card">
+        <h3>Set Custom Price (Hourly)</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+                <label>Day Price (5 AM - 6 PM)</label>
+                <input id="newDayPrice" type="number" placeholder="e.g. 800">
+            </div>
+            <div>
+                <label>Night Price (6 PM - 5 AM)</label>
+                <input id="newNightPrice" type="number" placeholder="e.g. 1200">
+            </div>
+        </div>
+        <button class="btn-price" onclick="updatePrice()">Update Pricing</button>
+        <div class="warning-box">
+            ⚠️ <strong>Notice:</strong> Make sure you pause the bookings before changing the prices to prevent calculation errors.
+        </div>
     </div>
 
     <div class="card">
@@ -97,6 +117,20 @@
         }
     }
 
+    async function updatePrice() {
+        const dayPrice = document.getElementById("newDayPrice").value;
+        const nightPrice = document.getElementById("newNightPrice").value;
+        if(!dayPrice || !nightPrice) return alert("Please enter both prices.");
+
+        const res = await fetch(`${BASE_URL}/set-price`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ dayPrice, nightPrice })
+        });
+        if(res.ok) alert("Pricing updated successfully!");
+        else alert("Failed to update pricing.");
+    }
+
     async function addOffline() {
         const body = { name: document.getElementById("offName").value || "Walk-in", date: document.getElementById("offDate").value, startHour: selectedSlot, duration: parseInt(document.getElementById("offDur").value), sport: "Offline" };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
@@ -114,6 +148,14 @@
             document.getElementById("statusTxt").innerText = s.paused ? "PAUSED" : "ACTIVE";
             const d = await (await fetch(`${BASE_URL}/dashboard`)).json();
             document.getElementById("rev").innerText = "₹" + d.revenue;
+            
+            // Auto-fill current prices
+            const p = await (await fetch(`${BASE_URL}/current-price`)).json();
+            if(p && !document.getElementById("newDayPrice").value) {
+                document.getElementById("newDayPrice").value = p.dayPrice;
+                document.getElementById("newNightPrice").value = p.nightPrice;
+            }
+
             const b = await (await fetch(`${BASE_URL}/bookings`)).json();
             const tbody = document.querySelector("#btable tbody");
             tbody.innerHTML = "";
