@@ -10,19 +10,14 @@
         .card{ background:white; padding:25px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.05); margin-bottom:25px; }
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
         .stat-card { background: white; padding: 20px; border-radius: 12px; text-align: center; border-left: 5px solid #1e3c72; }
-        
         input, select { width:100%; padding:10px; margin-bottom:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing: border-box; }
         button { padding:10px 20px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
-        
         .btn-pause { background:#ef4444; } .btn-resume { background:#22c55e; }
         .btn-blue { background: #0ea5e9; width: 100%; }
-        
-        /* Grid for Offline Booking */
         .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap:8px; margin-top:10px; }
         .slot{ padding:10px 5px; background:#22c55e; color:white; border-radius:8px; text-align:center; font-size:0.8rem; cursor:pointer; }
         .booked{ background:#fee2e2; color:#ef4444; cursor:not-allowed; }
         .selected{ background:#1e3c72 !important; border:2px solid black; }
-        
         table { width:100%; border-collapse:collapse; margin-top: 15px; }
         th, td { padding: 12px; border-bottom: 1px solid #f1f5f9; text-align: left; }
     </style>
@@ -52,11 +47,24 @@
 
     <div class="card">
         <h3>Custom Pricing</h3>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <input id="newDay" type="number" placeholder="Day Price">
-            <input id="newNight" type="number" placeholder="Night Price">
+        <div style="background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0; display: flex; justify-content: space-around;">
+            <div style="text-align: center;">
+                <small style="color: #64748b; display: block;">Current Day Price</small>
+                <strong id="currDay" style="color: #1e3c72; font-size: 1.2rem;">₹--</strong>
+            </div>
+            <div style="text-align: center;">
+                <small style="color: #64748b; display: block;">Current Night Price</small>
+                <strong id="currNight" style="color: #1e3c72; font-size: 1.2rem;">₹--</strong>
+            </div>
         </div>
-        <button class="btn-blue" onclick="updatePrice()">Save Prices</button>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <input id="newDay" type="number" placeholder="New Day Price">
+            <input id="newNight" type="number" placeholder="New Night Price">
+        </div>
+        <button class="btn-blue" onclick="updatePrice()">Save New Prices</button>
+        <p style="color: #ef4444; font-size: 0.85rem; margin-top: 10px; font-weight: bold; background: #fef2f2; padding: 8px; border-radius: 5px; border-left: 4px solid #ef4444;">
+            ⚠️ IMPORTANT: Make sure you pause the bookings before changing the price to avoid calculation errors.
+        </p>
     </div>
 
     <div class="card">
@@ -100,6 +108,14 @@
             const dRes = await fetch(`${BASE_URL}/dashboard`);
             const dData = await dRes.json();
             document.getElementById("revDisplay").innerText = "₹" + dData.revenue;
+
+            // Update Current Prices in UI
+            const priceRes = await fetch(`${BASE_URL}/current-price`);
+            const priceData = await priceRes.json();
+            if(priceData) {
+                document.getElementById("currDay").innerText = "₹" + priceData.dayPrice;
+                document.getElementById("currNight").innerText = "₹" + priceData.nightPrice;
+            }
 
             renderTable(currentBookings);
             loadOfflineGrid();
@@ -154,6 +170,7 @@
     async function updatePrice() {
         await fetch(`${BASE_URL}/set-price`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ dayPrice: newDay.value, nightPrice: newNight.value }) });
         alert("Prices Saved");
+        sync();
     }
 
     async function del(id) {
