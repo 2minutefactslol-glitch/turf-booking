@@ -32,7 +32,6 @@ async function init() {
 init();
 
 /* --- AUTHENTICATION ROUTES --- */
-
 app.post("/admin-login", (req, res) => {
     const { username, password } = req.body;
     if (username === "Jadalzamana" && password === "Ayasher123") {
@@ -42,15 +41,23 @@ app.post("/admin-login", (req, res) => {
     }
 });
 
-app.post("/verify-otp", (req, res) => {
-    if (req.body.otp === "123456") res.json({ success: true });
-    else res.status(400).json({ success: false });
-});
-
 /* --- BOOKING & PRICING ROUTES --- */
-
 app.post("/book", async (req, res) => {
     const { date, startHour, duration } = req.body;
+    
+    // --- DATE VALIDATION LOGIC ---
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Block past dates
+    if (date < todayStr) {
+        return res.status(400).json({ message: "Cannot book a past date." });
+    }
+    // Block past hours for today
+    if (date === todayStr && startHour <= now.getHours()) {
+        return res.status(400).json({ message: "Cannot book a past time slot." });
+    }
+
     const s = await Setting.findOne();
     if (s.bookingPaused) return res.status(403).json({ message: "Bookings are paused." });
     
