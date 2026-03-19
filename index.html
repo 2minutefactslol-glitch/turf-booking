@@ -1,185 +1,38 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>TurfPro | Book Now</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body{ font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:15px; }
-        .card{ background:white; padding:25px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin:auto; max-width:500px; }
-        h2{ color:#1e3c72; text-align:center; margin-bottom:20px; }
-        input{ width:100%; padding:12px; margin:10px 0; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:1rem; }
-        .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin:20px 0; min-height: 100px; }
-        .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; transition: 0.2s; border: 2px solid transparent; }
-        .booked{ background:#fee2e2 !important; color:#ef4444 !important; cursor:not-allowed; }
-        .past{ background:#e2e8f0 !important; color:#94a3b8 !important; cursor:not-allowed; pointer-events:none; }
-        .selected{ background:#1e3c72 !important; border:2px solid #000; transform: scale(1.05); }
-        .preview{ background:#f59e0b !important; }
-        .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
-        .btn:disabled{ background:#cbd5e1 !important; color:#94a3b8; }
-        #statusBanner { display:none; background:#fee2e2; color:#ef4444; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border: 1px solid #fecaca; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <div id="statusBanner">⚠️ ONLINE BOOKINGS PAUSED</div>
-    <h2>🏟️ TurfPro Booking</h2>
-    
-    <input id="userName" placeholder="Full Name" required>
-    <input id="userPhone" type="tel" maxlength="10" placeholder="10-digit Phone" required>
-    
-    <div id="otpBox" style="display:none; border:1px dashed #1e3c72; padding:10px; border-radius:10px; margin-bottom:10px;">
-        <input id="otpIn" type="tel" placeholder="Enter OTP (123456)">
-        <button class="btn" style="background:#1e3c72" onclick="verifyOTP()">Verify OTP</button>
-    </div>
-    <button id="vBtn" class="btn" style="background:#1e3c72" onclick="sendOTP()">Verify Phone to Book</button>
-
-    <label style="font-size:0.8rem; color:#64748b; font-weight:bold; margin-top:10px; display:block;">Select Date</label>
-    <input id="date" type="date" onchange="loadSlots()">
-    
-    <label style="font-size:0.8rem; color:#64748b; font-weight:bold; display:block;">Duration (Hours)</label>
-    <input id="dur" type="number" value="1" min="1" max="6" oninput="highlight(); calcPrice();">
-
-    <h1 id="price" style="text-align:center; color:#1e3c72; margin:15px 0;">₹0</h1>
-    <div id="slots" class="grid"></div>
-    
-    <button id="bookBtn" class="btn" onclick="bookNow()" disabled>Confirm Booking</button>
-</div>
-
-<script>
-    const BASE_URL = "https://turf-booking-natl.onrender.com";
-    let selectedSlot = null; let isVerified = false; let systemPaused = false;
-
-    // Timezone & Date Lock (IST)
-    const now = new Date();
-    const localToday = now.toLocaleDateString('en-CA');
-    const dt = document.getElementById("date");
-    dt.setAttribute('min', localToday);
-    const maxDate = new Date(); maxDate.setDate(now.getDate() + 7);
-    dt.setAttribute('max', maxDate.toLocaleDateString('en-CA'));
-    dt.value = localToday;
-
-    function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
-
-    async function sendOTP() { 
-        if(document.getElementById("userPhone").value.length < 10) return alert("Enter valid phone!");
-        alert("Demo OTP: 123456"); 
-        document.getElementById("otpBox").style.display="block"; 
-        document.getElementById("vBtn").style.display="none"; 
-    }
-
-    async function verifyOTP() {
-        // If your server has a real /verify-otp route, keep this. 
-        // If you are just testing locally, you can use: if(otpIn.value === "123456")
-        const res = await fetch(`${BASE_URL}/verify-otp`, { 
-            method:"POST", 
-            headers:{"Content-Type":"application/json"}, 
-            body:JSON.stringify({otp: document.getElementById("otpIn").value}) 
-        });
-        
-        if(res.ok || document.getElementById("otpIn").value === "123456") { 
-            isVerified = true; 
-            document.getElementById("otpBox").style.display="none"; 
-            alert("Phone Verified!"); 
-            checkStatus(); 
-        } else {
-            alert("Invalid OTP");
-        }
-    }
-
-    async function loadSlots() {
-        try {
-            const res = await fetch(`${BASE_URL}/bookings`);
-            const data = await res.json();
-            const grid = document.getElementById("slots"); 
-            grid.innerHTML = "";
-            const curH = new Date().getHours();
-            const isToday = dt.value === localToday;
-
-            for(let h=0; h<24; h++) {
-                const s = document.createElement("div"); 
-                s.className = "slot"; 
-                s.innerText = fmt(h);
-                
-                const isPast = isToday && h <= curH;
-                const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
-                
-                if(isPast) s.classList.add("past");
-                else if(isBooked) s.classList.add("booked");
-                else {
-                    if(selectedSlot === h) s.classList.add("selected");
-                    s.onclick = () => { if(!systemPaused) { selectedSlot = h; highlight(); calcPrice(); } };
-                }
-                grid.appendChild(s);
-            }
-            highlight();
-        } catch(e) { console.error("Grid load failed"); }
-    }
-
-    function highlight() {
-        const slots = document.querySelectorAll(".slot");
+// --- REPLACE calcPrice and bookNow in index.html ---
+async function calcPrice() {
+    if(selectedSlot === null) return;
+    try {
+        const p = await (await fetch(`${BASE_URL}/current-price`)).json();
+        let total = 0;
         const dr = parseInt(document.getElementById("dur").value) || 1;
-        slots.forEach(s => s.classList.remove("selected", "preview"));
-        if(selectedSlot === null) return;
-        
-        for(let i=0; i<dr; i++){
-            let h = selectedSlot + i;
-            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
-                slots[h].classList.add(i === 0 ? "selected" : "preview");
-            }
+        for(let i=0; i<dr; i++) {
+            let h = (selectedSlot + i) % 24;
+            total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
         }
-    }
+        const advance = Math.ceil(total * 0.10);
+        document.getElementById("price").innerHTML = `
+            <div style="font-size:0.9rem; color:gray">Total: ₹${total}</div>
+            <div style="color:#22c55e">Pay Advance: ₹${advance}</div>
+        `;
+        window.tempTotal = total;
+    } catch (e) {}
+}
 
-    async function calcPrice() {
-        if(selectedSlot === null) return;
-        try {
-            const p = await (await fetch(`${BASE_URL}/current-price`)).json();
-            let total = 0;
-            const dr = parseInt(document.getElementById("dur").value) || 1;
-            for(let i=0; i<dr; i++) {
-                let h = (selectedSlot + i) % 24;
-                total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
-            }
-            document.getElementById("price").innerText = "₹" + total;
-        } catch (e) { console.log("Price fetch failed"); }
-    }
-
-    async function checkStatus() {
-        try {
-            const res = await fetch(`${BASE_URL}/booking-status`);
-            const s = await res.json();
-            systemPaused = s.paused;
-            const bBtn = document.getElementById("bookBtn");
-            const banner = document.getElementById("statusBanner");
-            
-            banner.style.display = s.paused ? "block" : "none";
-            // Button is enabled ONLY if system is not paused AND user is verified
-            bBtn.disabled = s.paused || !isVerified;
-            bBtn.innerText = s.paused ? "System Paused" : (isVerified ? "Confirm Booking" : "Verify Phone to Book");
-        } catch(e) {}
-    }
-
-    async function bookNow() {
-        if(!selectedSlot) return alert("Select a slot!");
-        const body = { 
-            name: document.getElementById("userName").value, 
-            phone: document.getElementById("userPhone").value, 
-            date: dt.value, 
-            startHour: selectedSlot, 
-            duration: parseInt(document.getElementById("dur").value), 
-            sport: "Online" 
-        };
-        const res = await fetch(`${BASE_URL}/book`, { 
-            method:"POST", 
-            headers:{"Content-Type":"application/json"}, 
-            body:JSON.stringify(body) 
-        });
-        if(res.ok) { alert("Booked Successfully!"); location.reload(); } 
-        else alert((await res.json()).message);
-    }
-
-    setInterval(() => { checkStatus(); loadSlots(); }, 5000);
-    loadSlots();
-</script>
-</body>
-</html>
+async function bookNow() {
+    if(!selectedSlot) return alert("Select a slot!");
+    const body = { 
+        name: document.getElementById("userName").value, 
+        phone: document.getElementById("userPhone").value, 
+        date: dt.value, 
+        startHour: selectedSlot, 
+        duration: parseInt(document.getElementById("dur").value), 
+        sport: "Online" 
+    };
+    // Note: In real setup, Razorpay code goes here. On success, call /book.
+    const res = await fetch(`${BASE_URL}/book`, { 
+        method:"POST", 
+        headers:{"Content-Type":"application/json"}, 
+        body:JSON.stringify(body) 
+    });
+    if(res.ok) { alert("Booking Confirmed! Pay balance at turf."); location.reload(); }
+}
