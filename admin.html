@@ -21,6 +21,7 @@
         .collect-btn{ background:#22c55e; }
         .collect-btn:hover{ background:#16a34a; }
         .cancel-btn{ background:#ef4444; margin-left:5px; }
+        .warning-text { color: #ef4444; font-size: 0.8rem; font-weight: bold; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
@@ -50,12 +51,18 @@
         <input id="nd" type="number" placeholder="New Day Price">
         <input id="nn" type="number" placeholder="New Night Price">
     </div>
-    <button style="background:#1e3c72; width:100%" onclick="updatePrice()">Update Prices</button>
+    <div style="display:flex; align-items: center; gap: 15px;">
+        <button style="background:#1e3c72; flex: 1;" onclick="updatePrice()">Update Prices</button>
+        <span class="warning-text">⚠️ PAUSE bookings before changing prices!</span>
+    </div>
 </div>
 
 <div class="card">
     <h3>📝 Quick Offline Booking</h3>
-    <input id="on" placeholder="Customer Name (Walk-in)">
+    <div style="display:flex; gap:10px;">
+        <input id="on" placeholder="Customer Name (Walk-in)">
+        <input id="op" type="tel" maxlength="10" placeholder="Phone Number">
+    </div>
     <div style="display:flex; gap:10px;">
         <input id="od" type="date" onchange="loadOGrid()">
         <input id="oDur" type="number" value="1" min="1" max="6" oninput="highlight();">
@@ -106,8 +113,6 @@
         let h = "";
         [...bookings].reverse().forEach(b => {
             const rem = (b.totalAmount || 0) - (b.advancePaid || 0);
-            
-            // Payment Column Logic
             let paymentHTML = "";
             if(b.isCollected) {
                 paymentHTML = `
@@ -177,9 +182,16 @@
 
     async function addOff() {
         if(selS === null) return alert("Select a slot!");
-        const body = { name: on.value||"Walk-in", phone:"Manual", date: od.value, startHour: selS, duration: parseInt(oDur.value), sport: "Offline" };
+        const body = { 
+            name: on.value||"Walk-in", 
+            phone: op.value||"Manual", 
+            date: od.value, 
+            startHour: selS, 
+            duration: parseInt(oDur.value), 
+            sport: "Offline" 
+        };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { selS=null; on.value=""; sync(); alert("Offline booking added!"); }
+        if(res.ok) { selS=null; on.value=""; op.value=""; sync(); alert("Offline booking added!"); }
     }
 
     async function updatePrice() {
