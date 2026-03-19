@@ -3,21 +3,21 @@
 <head>
     <title>TurfPro | Book Now</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:15px; }
         .card{ background:white; padding:25px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin:auto; max-width:500px; }
         h2{ color:#1e3c72; text-align:center; margin-bottom:20px; }
         input{ width:100%; padding:12px; margin:10px 0; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:1rem; }
-        
-        /* THE GRID SECTION - RESTORED */
         .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin:20px 0; min-height: 100px; }
         .slot{ padding:15px 5px; background:#22c55e; color:white; border-radius:10px; text-align:center; font-weight:bold; cursor:pointer; transition: 0.2s; border: 2px solid transparent; }
-        
         .booked{ background:#fee2e2 !important; color:#ef4444 !important; cursor:not-allowed; }
         .past{ background:#e2e8f0 !important; color:#94a3b8 !important; cursor:not-allowed; pointer-events:none; }
         .selected{ background:#1e3c72 !important; border:2px solid #000; transform: scale(1.05); }
         .preview{ background:#f59e0b !important; }
-        
         .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
         .btn:disabled{ background:#cbd5e1 !important; color:#94a3b8; }
         #statusBanner { display:none; background:#fee2e2; color:#ef4444; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border: 1px solid #fecaca; }
@@ -32,11 +32,13 @@
     <input id="userName" placeholder="Full Name">
     <input id="userPhone" type="tel" maxlength="10" placeholder="10-digit Phone">
     
+    <div id="recaptcha-container"></div>
+
     <div id="otpBox" style="display:none; border:1px dashed #1e3c72; padding:10px; border-radius:10px; margin-bottom:10px;">
-        <input id="otpIn" type="tel" placeholder="Enter OTP (123456)">
+        <input id="otpIn" type="tel" placeholder="Enter 6-Digit OTP">
         <button class="btn" style="background:#1e3c72" onclick="verifyOTP()">Verify OTP</button>
     </div>
-    <button id="vBtn" class="btn" style="background:#1e3c72" onclick="sendOTP()">Verify Phone to Book</button>
+    <button id="vBtn" class="btn" style="background:#1e3c72" onclick="sendOTP()">Send Real OTP</button>
 
     <label style="font-size:0.8rem; color:#64748b; font-weight:bold;">Select Date</label>
     <input id="date" type="date" onchange="loadSlots()">
@@ -45,15 +47,27 @@
     <input id="dur" type="number" value="1" min="1" max="6" oninput="highlight(); calcPrice();">
 
     <h1 id="price" style="text-align:center; color:#1e3c72; margin:15px 0;">₹0</h1>
-    
     <div id="slots" class="grid"></div>
-    
     <button id="bookBtn" class="btn" onclick="bookNow()" disabled>Confirm Booking</button>
 </div>
 
 <script>
+    // --- 2. YOUR FIREBASE CONFIG ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyA4KEP807FnLL8K_--Rcf0Sy4K_iMntAAI",
+        authDomain: "turfpro-ef4a5.firebaseapp.com",
+        projectId: "turfpro-ef4a5",
+        storageBucket: "turfpro-ef4a5.firebasestorage.app",
+        messagingSenderId: "529344115255",
+        appId: "1:529344115255:web:a83ef2ca5093024c1885b2",
+        measurementId: "G-XQG8T06HHE"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     let selectedSlot = null; let isVerified = false; let systemPaused = false;
+    let confirmationResult = null;
 
     // Timezone & Date Lock (IST)
     const now = new Date();
@@ -64,12 +78,39 @@
     dt.setAttribute('max', max.toLocaleDateString('en-CA'));
     dt.value = localToday;
 
+    // Initialize Invisible reCAPTCHA
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' });
+
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
 
-    async function sendOTP() { alert("Demo OTP: 123456"); otpBox.style.display="block"; vBtn.style.display="none"; }
+    // --- 3. UPDATED FIREBASE OTP FUNCTIONS ---
+    async function sendOTP() {
+        const p = document.getElementById("userPhone").value;
+        if(p.length < 10) return alert("Enter valid 10-digit number!");
+        
+        const phoneNumber = "+91" + p;
+        const appVerifier = window.recaptchaVerifier;
+
+        auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+            .then((result) => {
+                confirmationResult = result;
+                document.getElementById("otpBox").style.display = "block";
+                document.getElementById("vBtn").style.display = "none";
+                alert("OTP Sent to " + phoneNumber);
+            }).catch((error) => {
+                alert("Error: " + error.message);
+                window.recaptchaVerifier.render();
+            });
+    }
+
     async function verifyOTP() {
-        const res = await fetch(`${BASE_URL}/verify-otp`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({otp: otpIn.value}) });
-        if(res.ok) { isVerified = true; otpBox.style.display="none"; alert("Verified!"); checkStatus(); }
+        const code = document.getElementById("otpIn").value;
+        confirmationResult.confirm(code).then((result) => {
+            isVerified = true;
+            document.getElementById("otpBox").style.display = "none";
+            alert("Phone Verified!");
+            checkStatus();
+        }).catch((error) => alert("Invalid OTP!"));
     }
 
     async function loadSlots() {
@@ -78,18 +119,13 @@
             const data = await res.json();
             const grid = document.getElementById("slots"); 
             grid.innerHTML = "";
-            
             const curH = new Date().getHours();
             const isToday = dt.value === localToday;
 
             for(let h=0; h<24; h++) {
-                const s = document.createElement("div"); 
-                s.className = "slot"; 
-                s.innerText = fmt(h);
-                
+                const s = document.createElement("div"); s.className = "slot"; s.innerText = fmt(h);
                 const isPast = isToday && h <= curH;
                 const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
-                
                 if(isPast) s.classList.add("past");
                 else if(isBooked) s.classList.add("booked");
                 else {
@@ -98,8 +134,8 @@
                 }
                 grid.appendChild(s);
             }
-            highlight(); // Ensure highlights remain after grid refresh
-        } catch(e) { console.error("Grid load failed"); }
+            highlight();
+        } catch(e) {}
     }
 
     function highlight() {
@@ -107,13 +143,9 @@
         const dr = parseInt(dur.value) || 1;
         slots.forEach(s => s.classList.remove("selected", "preview"));
         if(selectedSlot === null) return;
-        
         for(let i=0; i<dr; i++){
             let h = selectedSlot + i;
-            // Highlight logic based on time slots (0-23)
-            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
-                slots[h].classList.add(i === 0 ? "selected" : "preview");
-            }
+            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) slots[h].classList.add(i === 0 ? "selected" : "preview");
         }
     }
 
@@ -136,7 +168,6 @@
             systemPaused = s.paused;
             const bBtn = document.getElementById("bookBtn");
             const banner = document.getElementById("statusBanner");
-            
             banner.style.display = s.paused ? "block" : "none";
             bookBtn.disabled = s.paused || !isVerified;
             bookBtn.innerText = s.paused ? "System Paused" : (isVerified ? "Confirm Booking" : "Verify Phone to Book");
@@ -156,7 +187,6 @@
         if(res.ok) { alert("Booked!"); location.reload(); } else alert((await res.json()).message);
     }
 
-    // Refresh every 5 seconds
     setInterval(() => { checkStatus(); loadSlots(); }, 5000);
     loadSlots();
 </script>
