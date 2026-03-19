@@ -17,7 +17,6 @@
         .btn{ width:100%; padding:15px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1.1rem; }
         .btn:disabled{ background:#cbd5e1 !important; color:#94a3b8; }
         
-        /* Pricing Box Style */
         #priceBox { background:#f8fafc; padding:15px; border-radius:10px; text-align:center; margin-bottom:15px; border:1px solid #e2e8f0; }
         #statusBanner { display:none; background:#fee2e2; color:#ef4444; padding:10px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border: 1px solid #fecaca; }
     </style>
@@ -45,7 +44,9 @@
 
     <div id="priceBox">
         <div style="font-size:0.9rem; color:gray">Total Amount: <span id="totalPrice">₹0</span></div>
-        <div style="font-size:1.3rem; color:#1e3c72; font-weight:bold; margin:5px 0;">Pay Advance: <span id="advancePrice">₹0</span></div>
+        <div style="font-size:1.3rem; color:#1e3c72; font-weight:bold; margin:5px 0;">
+            Pay Advance (10%): <span id="advancePrice">₹0</span>
+        </div>
         <small style="color:#64748b">Remaining balance to be paid at the turf</small>
     </div>
 
@@ -55,12 +56,10 @@
 </div>
 
 <script>
-    // ⚠️ REPLACE THIS WITH YOUR ACTUAL RENDER URL
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     
     let selectedSlot = null; let isVerified = false; let systemPaused = false;
 
-    // Timezone & Date Lock (IST)
     const now = new Date();
     const localToday = now.toLocaleDateString('en-CA');
     const dt = document.getElementById("date");
@@ -142,8 +141,6 @@
                 let h = (selectedSlot + i) % 24;
                 total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
             }
-            
-            // UI Update for 10% logic
             const advance = Math.ceil(total * 0.10);
             document.getElementById("totalPrice").innerText = "₹" + total;
             document.getElementById("advancePrice").innerText = "₹" + advance;
