@@ -4,9 +4,9 @@
     <title>TurfPro | Book Now</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>
-        // SECURITY CHECK: Redirect to login if not authenticated
+        // REDIRECT TO login.html IF NOT LOGGED IN
         if(localStorage.getItem("customerLoggedIn") !== "true") {
-            window.location.href = "customer-login.html";
+            window.location.href = "login.html";
         }
     </script>
     <style>
@@ -46,24 +46,23 @@
     <div id="priceBox">
         <div style="font-size:0.9rem; color:gray">Total Amount: <span id="totalPrice">₹0</span></div>
         <div style="font-size:1.3rem; color:#1e3c72; font-weight:bold; margin:5px 0;">Pay Advance (10%): <span id="advancePrice">₹0</span></div>
-        <small style="color:#64748b">Pay balance at the turf counter</small>
+        <small style="color:#64748b">Remaining balance at turf</small>
     </div>
 
     <div id="slots" class="grid"></div>
-    
-    <button id="bookBtn" class="btn" onclick="bookNow()">Confirm & Book</button>
+    <button id="bookBtn" class="btn" onclick="bookNow()">Confirm Booking</button>
 </div>
 
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     let selectedSlot = null; let systemPaused = false;
 
-    // Load User Data from localStorage
+    // Load Session Data
     const savedName = localStorage.getItem("customerName");
     const savedPhone = localStorage.getItem("customerPhone");
     document.getElementById("userNameDisplay").innerText = "Hi, " + savedName;
 
-    // Timezone & Date Lock (IST)
+    // Date Settings
     const now = new Date();
     const localToday = now.toLocaleDateString('en-CA');
     const dt = document.getElementById("date");
@@ -84,7 +83,6 @@
                 const s = document.createElement("div"); s.className = "slot"; s.innerText = fmt(h);
                 const isPast = isToday && h <= curH;
                 const isBooked = data.find(b => b.date === dt.value && h >= b.startHour && h < b.startHour + b.duration);
-                
                 if(isPast) s.classList.add("past");
                 else if(isBooked) s.classList.add("booked");
                 else {
@@ -104,9 +102,7 @@
         if(selectedSlot === null) return;
         for(let i=0; i<dr; i++){
             let h = selectedSlot + i;
-            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
-                slots[h].classList.add(i === 0 ? "selected" : "preview");
-            }
+            if(slots[h] && !slots[h].classList.contains("booked")) slots[h].classList.add(i === 0 ? "selected" : "preview");
         }
     }
 
@@ -114,8 +110,7 @@
         if(selectedSlot === null) return;
         const p = await (await fetch(`${BASE_URL}/current-price`)).json();
         let total = 0;
-        const dr = parseInt(document.getElementById("dur").value) || 1;
-        for(let i=0; i<dr; i++) {
+        for(let i=0; i<parseInt(dur.value); i++) {
             let h = (selectedSlot + i) % 24;
             total += (h >= 5 && h < 18) ? p.dayPrice : p.nightPrice;
         }
@@ -124,40 +119,24 @@
     }
 
     async function checkStatus() {
-        const res = await fetch(`${BASE_URL}/booking-status`);
-        const s = await res.json();
-        systemPaused = s.paused;
-        document.getElementById("statusBanner").style.display = s.paused ? "block" : "none";
-        document.getElementById("bookBtn").disabled = s.paused;
-        document.getElementById("bookBtn").innerText = s.paused ? "Online Bookings Paused" : "Confirm & Book";
+        try {
+            const res = await fetch(`${BASE_URL}/booking-status`);
+            const s = await res.json();
+            systemPaused = s.paused;
+            document.getElementById("statusBanner").style.display = s.paused ? "block" : "none";
+            document.getElementById("bookBtn").disabled = s.paused;
+        } catch(e) {}
     }
 
     async function bookNow() {
-        if(selectedSlot === null) return alert("Please select a time slot!");
-        const body = { 
-            name: savedName, 
-            phone: savedPhone, 
-            date: dt.value, 
-            startHour: selectedSlot, 
-            duration: parseInt(document.getElementById("dur").value), 
-            sport: "Online" 
-        };
-        const res = await fetch(`${BASE_URL}/book`, { 
-            method:"POST", 
-            headers:{"Content-Type":"application/json"}, 
-            body:JSON.stringify(body) 
-        });
-        if(res.ok) { 
-            alert("Booking Confirmed! Please pay the 10% advance via UPI to complete the reservation."); 
-            location.reload(); 
-        }
+        if(selectedSlot === null) return alert("Select a slot!");
+        const body = { name: savedName, phone: savedPhone, date: dt.value, startHour: selectedSlot, duration: parseInt(dur.value), sport: "Online" };
+        const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+        if(res.ok) { alert("Booked! Please pay the 10% advance to confirm."); location.reload(); }
     }
 
     function logout() {
-        if(confirm("Logout from TurfPro?")) {
-            localStorage.clear();
-            window.location.reload();
-        }
+        if(confirm("Logout?")) { localStorage.clear(); window.location.href = "login.html"; }
     }
 
     setInterval(() => { checkStatus(); loadSlots(); }, 5000);
