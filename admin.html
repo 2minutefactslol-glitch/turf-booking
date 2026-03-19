@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro Admin | Pro Control</title>
+    <title>TurfPro Admin | Financials</title>
     <script>if(localStorage.getItem("adminLoggedIn")!=="true") window.location.href="login.html";</script>
     <style>
         body{ font-family: sans-serif; background:#f4f6f9; margin:0; padding:20px; }
@@ -11,24 +11,23 @@
         input{ width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
         .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(75px, 1fr)); gap:5px; margin-top:10px; }
         .slot{ padding:10px 2px; background:#22c55e; color:white; border-radius:5px; text-align:center; font-size:0.7rem; cursor:pointer; font-weight:bold; }
-        .booked{ background:#ef4444 !important; color:white !important; cursor:not-allowed; } 
-        .past{ background:#e2e8f0 !important; pointer-events:none; color:#94a3b8 !important; }
-        .selected{ background:#1e3c72 !important; border:2px solid black; }
-        .preview{ background:#f59e0b !important; }
-        table{ width:100%; border-collapse:collapse; } th, td{ padding:12px; border-bottom:1px solid #eee; text-align:left; }
-        button{ padding:10px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+        .booked{ background:#ef4444 !important; } .past{ background:#e2e8f0 !important; color:#94a3b8 !important; }
+        .selected{ background:#1e3c72 !important; border:2px solid black; } .preview{ background:#f59e0b !important; }
+        table{ width:100%; border-collapse:collapse; } th, td{ padding:12px; border-bottom:1px solid #eee; text-align:left; font-size:0.9rem; }
+        button{ padding:8px 12px; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+        .collect-btn{ background:#22c55e; } .collect-btn:disabled{ background:#cbd5e1; cursor:default; }
     </style>
 </head>
 <body>
 
 <div class="stats-grid">
     <div class="stat-card">
-        <small>Today's Revenue (IST)</small>
+        <small>Total Revenue Collected (Today)</small>
         <h2 id="rev">₹0</h2>
-        <button onclick="downloadReport()" style="background:#0ea5e9; width:100%">Download CSV</button>
+        <button onclick="downloadReport()" style="background:#0ea5e9; width:100%">Download CSV Report</button>
     </div>
     <div class="stat-card">
-        <small>System Control</small>
+        <small>System Status</small>
         <div style="margin-top:15px">
             <button style="background:#ef4444" onclick="toggleSys(true)">Pause</button>
             <button style="background:#22c55e" onclick="toggleSys(false)">Resume</button>
@@ -38,40 +37,37 @@
 </div>
 
 <div class="card">
-    <h3>Set Pricing</h3>
-    <div style="background:#f8fafc; padding:10px; margin-bottom:10px; display:flex; justify-content:space-around;">
-        <span>Day: <b id="cd">₹--</b></span> <span>Night: <b id="cn">₹--</b></span>
-    </div>
-    <input id="nd" type="number" placeholder="New Day Price">
-    <input id="nn" type="number" placeholder="New Night Price">
-    <button style="background:#1e3c72; width:100%" onclick="updatePrice()">Update Prices</button>
-    <p style="color:red; font-size:0.75rem; font-weight:bold; margin-top:8px;">⚠️ PAUSE bookings before changing prices!</p>
+    <h3>Live Bookings & Balance Tracking</h3>
+    <table>
+        <thead><tr><th>Customer</th><th>Phone</th><th>Slot</th><th>Payment Status</th><th>Action</th></tr></thead>
+        <tbody id="bt"></tbody>
+    </table>
 </div>
 
 <div class="card">
-    <h3>Offline Booking</h3>
+    <h3>Quick Offline Booking</h3>
     <input id="on" placeholder="Customer Name">
     <input id="od" type="date" onchange="loadOGrid()">
     <input id="oDur" type="number" value="1" min="1" max="6" oninput="highlight();">
     <div id="oGrid" class="grid"></div>
-    <button style="background:#22c55e; width:100%; margin-top:15px; padding:12px;" onclick="addOff()">Confirm Offline Booking</button>
+    <button style="background:#1e3c72; width:100%; margin-top:15px;" onclick="addOff()">Book Walk-in</button>
 </div>
 
 <div class="card">
-    <h3>Live Bookings</h3>
-    <table>
-        <thead><tr><th>Name</th><th>Phone</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>
-        <tbody id="bt"></tbody>
-    </table>
+    <h3>Pricing Engine</h3>
+    <div style="display:flex; justify-content:space-around; background:#f1f5f9; padding:10px; margin-bottom:10px; border-radius:8px;">
+        <span>Current Day: <b id="cd">₹--</b></span> <span>Night: <b id="cn">₹--</b></span>
+    </div>
+    <input id="nd" type="number" placeholder="New Day Price">
+    <input id="nn" type="number" placeholder="New Night Price">
+    <button style="background:#1e3c72; width:100%" onclick="updatePrice()">Save Prices</button>
 </div>
 
 <script>
     const BASE_URL = "https://turf-booking-natl.onrender.com";
     let bookings = []; let selS = null;
-    
-    // IST Today Date Lock
     const localToday = new Date().toLocaleDateString('en-CA');
-    od.setAttribute('min', localToday); od.value = localToday;
+    od.value = localToday;
 
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
 
@@ -91,9 +87,29 @@
     function render() {
         let h = "";
         [...bookings].reverse().forEach(b => {
-            h += `<tr><td><strong>${b.name||'Walk-in'}</strong></td><td>${b.phone||'N/A'}</td><td>${b.date}</td><td>${fmt(b.startHour)} (${b.duration}h)</td><td><button style="background:red" onclick="del('${b._id}')">Cancel</button></td></tr>`;
+            const rem = b.totalAmount - b.advancePaid;
+            h += `<tr>
+                <td><b>${b.name||'Walk-in'}</b><br><small>${b.sport}</small></td>
+                <td>${b.phone}</td>
+                <td>${b.date}<br>${fmt(b.startHour)}</td>
+                <td>
+                    <small>Adv: ₹${b.advancePaid}</small><br>
+                    <b style="color:${b.isCollected?'green':'red'}">Rem: ₹${b.isCollected?0:rem}</b>
+                </td>
+                <td>
+                    <button class="collect-btn" ${b.isCollected?'disabled':''} onclick="collect('${b._id}')">${b.isCollected?'Paid':'Collect'}</button>
+                    <button style="background:red; margin-left:5px" onclick="del('${b._id}')">X</button>
+                </td>
+            </tr>`;
         });
-        bt.innerHTML = h || "<tr><td colspan='5' style='text-align:center'>No bookings found</td></tr>";
+        bt.innerHTML = h || "<tr><td colspan='5' style='text-align:center'>No bookings</td></tr>";
+    }
+
+    async function collect(id) {
+        if(confirm("Mark balance as collected?")) {
+            await fetch(`${BASE_URL}/collect-payment/${id}`, { method:"POST" });
+            sync();
+        }
     }
 
     function loadOGrid() {
@@ -102,9 +118,8 @@
         const isToday = od.value === localToday;
         for(let h=0; h<24; h++){
             const s = document.createElement("div"); s.className="slot"; s.innerText=fmt(h);
-            const isPast = isToday && h <= curH;
             const isBooked = bookings.find(b => b.date===od.value && h>=b.startHour && h<b.startHour+b.duration);
-            if(isPast) s.classList.add("past");
+            if(isToday && h <= curH) s.classList.add("past");
             else if(isBooked) s.classList.add("booked");
             else {
                 if(selS===h) s.classList.add("selected");
@@ -127,21 +142,15 @@
     }
 
     async function addOff() {
-        if(selS === null) return alert("Select a slot!");
-        const body = { name: on.value||"Offline", phone:"Manual", date: od.value, startHour: selS, duration: parseInt(oDur.value), sport: "Offline" };
+        if(selS === null) return alert("Select slot!");
+        const body = { name: on.value||"Walk-in", phone:"Offline", date: od.value, startHour: selS, duration: parseInt(oDur.value), sport: "Offline" };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { 
-            alert("Booked Successfully!"); 
-            selS=null; on.value=""; sync(); 
-        } else {
-            const err = await res.json();
-            alert("Error: " + err.message);
-        }
+        if(res.ok) { selS=null; on.value=""; sync(); }
     }
 
     async function updatePrice() {
         await fetch(`${BASE_URL}/set-price`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({dayPrice:nd.value, nightPrice:nn.value}) });
-        alert("Prices Saved!"); sync();
+        alert("Saved!"); sync();
     }
 
     async function toggleSys(status) {
@@ -152,9 +161,9 @@
     async function del(id) { if(confirm("Cancel?")) await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); sync(); }
 
     function downloadReport() {
-        let csv = "Name,Phone,Date,Time,Duration\n";
-        bookings.forEach(b => csv += `${b.name},${b.phone},${b.date},${fmt(b.startHour)},${b.duration}\n`);
-        const a = document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download=`Report_${localToday}.csv`; a.click();
+        let csv = "Name,Phone,Date,Time,Total,Advance,Balance_Collected\n";
+        bookings.forEach(b => csv += `${b.name},${b.phone},${b.date},${fmt(b.startHour)},${b.totalAmount},${b.advancePaid},${b.isCollected}\n`);
+        const a = document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download=`Revenue_Report_${localToday}.csv`; a.click();
     }
 
     setInterval(sync, 2000); sync();
