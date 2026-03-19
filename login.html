@@ -1,61 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>TurfPro | Customer Login</title>
+    <title>TurfPro | Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#f1f5f9; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
         .card{ background:white; padding:30px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:90%; max-width:400px; text-align:center; }
-        h2{ color:#1e3c72; margin-bottom:10px; }
         input{ width:100%; padding:12px; margin:10px 0; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:1rem; }
-        .btn{ width:100%; padding:15px; background:#1e3c72; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; font-size:1rem; margin-top:10px; }
-        .btn:hover{ background:#152c52; }
-        #otpBox { margin-top:15px; border-top:1px solid #eee; padding-top:15px; }
+        .btn{ width:100%; padding:15px; background:#1e3c72; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>🏟️ TurfPro Login</h2>
-        <p style="color:#64748b; font-size:0.9rem;">Login once to book slots instantly.</p>
-        
-        <input id="cName" placeholder="Your Full Name">
-        <input id="cPhone" type="tel" maxlength="10" placeholder="10-digit Phone Number">
-        
+        <input id="cName" placeholder="Full Name">
+        <input id="cPhone" type="tel" maxlength="10" placeholder="10-digit Phone">
         <div id="otpBox" style="display:none;">
-            <input id="otpIn" type="tel" placeholder="Enter OTP (123456)">
-            <button class="btn" style="background:#22c55e" onclick="verify()">Verify & Enter</button>
+            <input id="otpIn" placeholder="Enter 123456">
+            <button class="btn" style="background:#22c55e" onclick="verify()">Verify</button>
         </div>
-        
-        <button id="lBtn" class="btn" onclick="sendOTP()">Send OTP</button>
+        <button id="lBtn" class="btn" onclick="sendOTP()">Get OTP</button>
     </div>
 
     <script>
-        // If already logged in, skip to index
-        if(localStorage.getItem("customerLoggedIn") === "true") {
-            window.location.href = "index.html";
-        }
-
         function sendOTP() {
-            const name = document.getElementById("cName").value;
-            const phone = document.getElementById("cPhone").value;
-            if(!name || phone.length < 10) return alert("Enter Name and 10-digit Phone!");
-            
+            if(cPhone.value.length < 10) return alert("Enter 10 digits!");
             alert("Demo OTP: 123456");
             document.getElementById("otpBox").style.display="block";
             document.getElementById("lBtn").style.display="none";
         }
-
         function verify() {
-            const otp = document.getElementById("otpIn").value;
-            if(otp === "123456") {
-                // Persistent Login Storage
-                localStorage.setItem("customerName", document.getElementById("cName").value);
-                localStorage.setItem("customerPhone", document.getElementById("cPhone").value);
+            if(otpIn.value === "123456") {
+                localStorage.setItem("customerName", cName.value);
+                localStorage.setItem("customerPhone", cPhone.value);
                 localStorage.setItem("customerLoggedIn", "true");
-                window.location.href = "index.html";
-            } else {
-                alert("Invalid OTP! Try 123456");
-            }
+                window.location.href = "index.html"; // Make sure index.html is in the same folder!
+            } else { alert("Wrong OTP"); }
         }
     </script>
 </body>
