@@ -3,14 +3,14 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
 
-// Updated CORS to ensure other devices can connect without issues
+// Enable CORS for all origins to allow mobile/other devices to connect
 app.use(cors({ origin: "*" })); 
 app.use(express.json());
 
 const DB_URI = "mongodb://Admin:Nihalreddy123@ac-ktmpoty-shard-00-00.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-01.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-02.d0nniyi.mongodb.net:27017/turf?ssl=true&replicaSet=atlas-14f8at-shard-0&authSource=admin&retryWrites=true&w=majority";
 mongoose.connect(DB_URI).then(() => console.log("✅ MongoDB Connected (Advance Payment Mode)"));
 
-// --- UPDATED SCHEMA ---
+// --- DATABASE SCHEMAS ---
 const Booking = mongoose.model("Booking", new mongoose.Schema({
     name: String, 
     phone: String, 
@@ -34,6 +34,8 @@ async function init() {
 }
 init();
 
+// --- API ROUTES ---
+
 app.post("/admin-login", (req, res) => {
     if (req.body.username === "Jadalzamana" && req.body.password === "Ayasher123") res.json({ success: true });
     else res.status(401).json({ success: false });
@@ -46,7 +48,6 @@ app.post("/book", async (req, res) => {
     const indiaTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"});
     const now = new Date(indiaTime);
     const todayStr = now.toISOString().split('T')[0];
-    const currentHour = now.getHours();
 
     if (date < todayStr) return res.status(400).json({ message: "Date passed." });
     
@@ -112,9 +113,14 @@ app.get("/dashboard", async (req, res) => {
     res.json({ revenue: rev });
 });
 
-// Bind to 0.0.0.0 to allow access from any device on your local network
+// --- SERVER START ---
 const PORT = process.env.PORT || 5000;
+
+// Binding to '0.0.0.0' allows external devices on your Wi-Fi to reach the server
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server Live (10% Advance Mode)`);
-    console.log(`Port: ${PORT}`);
+    console.log(`\n🚀 Server Live (10% Advance Mode)`);
+    console.log(`--------------------------------------`);
+    console.log(`Local Access:   http://localhost:${PORT}`);
+    console.log(`Network Access: http://192.168.0.105:${PORT}`);
+    console.log(`--------------------------------------\n`);
 });
