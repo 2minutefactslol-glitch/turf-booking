@@ -22,9 +22,8 @@
     </div>
 
     <script>
-        // IMPORTANT: Change 'localhost' to your Computer's IP (e.g., 192.168.1.5) 
-        // if you are testing on a phone or another laptop.
-        const BASE_URL = "http://localhost:5000"; 
+        // Updated to your specific Network IP
+        const BASE_URL = "http://192.168.0.105:5000"; 
 
         async function login() {
             const u = document.getElementById("user").value;
@@ -40,14 +39,13 @@
                 const data = await res.json();
 
                 if(res.ok && data.success) {
-                    // This sets the permission key your Admin page looks for
                     localStorage.setItem("adminLoggedIn", "true");
                     window.location.href = "admin.html";
                 } else {
                     alert("Invalid Admin Credentials!");
                 }
             } catch (e) {
-                alert("Server not reachable! Check if your backend is running.");
+                alert("Server not reachable! Check if your backend is running at " + BASE_URL);
             }
         }
     </script>
