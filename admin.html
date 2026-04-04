@@ -19,7 +19,6 @@
         th, td{ padding:12px; border-bottom:1px solid #eee; text-align:left; font-size:0.9rem; }
         button{ padding:10px; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; transition: 0.2s; }
         .collect-btn{ background:#22c55e; }
-        .collect-btn:hover{ background:#16a34a; }
         .cancel-btn{ background:#ef4444; margin-left:5px; }
         .warning-text { color: #ef4444; font-size: 0.8rem; font-weight: bold; margin-top: 5px; display: block; }
     </style>
@@ -88,11 +87,13 @@
 </div>
 
 <script>
-    const BASE_URL = "https://turf-booking-natl.onrender.com";
-    let bookings = []; let selS = null;
+    // IMPORTANT: Change 'localhost' to your laptop's IP address (e.g., 192.168.1.XX)
+    const BASE_URL = "http://localhost:5000"; 
     
+    let bookings = []; let selS = null;
     const localToday = new Date().toLocaleDateString('en-CA');
-    od.setAttribute('min', localToday); od.value = localToday;
+    document.getElementById('od').setAttribute('min', localToday); 
+    document.getElementById('od').value = localToday;
 
     function fmt(h) { return (h % 12 || 12) + (h >= 12 ? " PM" : " AM"); }
 
@@ -102,32 +103,21 @@
             const dR = await fetch(`${BASE_URL}/dashboard`); const dD = await dR.json();
             document.getElementById("rev").innerText = "₹" + (dD.revenue || 0);
             const pR = await fetch(`${BASE_URL}/current-price`); const pD = await pR.json();
-            cd.innerText = "₹"+pD.dayPrice; cn.innerText = "₹"+pD.nightPrice;
+            document.getElementById("cd").innerText = "₹"+pD.dayPrice; 
+            document.getElementById("cn").innerText = "₹"+pD.nightPrice;
             const sR = await fetch(`${BASE_URL}/booking-status`); const sD = await sR.json();
-            statusTxt.innerText = "Status: " + (sD.paused ? "PAUSED" : "ACTIVE");
+            document.getElementById("statusTxt").innerText = "Status: " + (sD.paused ? "PAUSED" : "ACTIVE");
             render(); loadOGrid();
-        } catch(e){}
+        } catch(e){ console.log("Connection error to:", BASE_URL); }
     }
 
     function render() {
         let h = "";
         [...bookings].reverse().forEach(b => {
             const rem = (b.totalAmount || 0) - (b.advancePaid || 0);
-            let paymentHTML = "";
-            if(b.isCollected) {
-                paymentHTML = `
-                    <div style="color:green; font-weight:bold;">
-                        Adv: ₹${b.advancePaid}<br>
-                        Paid: ₹${rem}<br>
-                        Total: ₹${b.totalAmount} ✅
-                    </div>`;
-            } else {
-                paymentHTML = `
-                    <div style="color:#64748b;">
-                        Adv: ₹${b.advancePaid}<br>
-                        <span style="color:red; font-weight:bold;">Pending: ₹${rem}</span>
-                    </div>`;
-            }
+            let paymentHTML = b.isCollected ? 
+                `<div style="color:green; font-weight:bold;">Adv: ₹${b.advancePaid}<br>Paid: ₹${rem}<br>Total: ₹${b.totalAmount} ✅</div>` :
+                `<div style="color:#64748b;">Adv: ₹${b.advancePaid}<br><span style="color:red; font-weight:bold;">Pending: ₹${rem}</span></div>`;
 
             h += `<tr>
                 <td><strong>${b.name||'Walk-in'}</strong><br><small style="color:blue">${b.sport}</small></td>
@@ -140,7 +130,7 @@
                 </td>
             </tr>`;
         });
-        bt.innerHTML = h || "<tr><td colspan='5' style='text-align:center'>No bookings found</td></tr>";
+        document.getElementById("bt").innerHTML = h || "<tr><td colspan='5' style='text-align:center'>No bookings found</td></tr>";
     }
 
     async function collect(id, amount) {
@@ -151,13 +141,14 @@
     }
 
     function loadOGrid() {
+        const oGrid = document.getElementById("oGrid");
         oGrid.innerHTML = "";
         const curH = new Date().getHours();
-        const isToday = od.value === localToday;
+        const isToday = document.getElementById("od").value === localToday;
         for(let h=0; h<24; h++){
             const s = document.createElement("div"); s.className="slot"; s.innerText=fmt(h);
             const isPast = isToday && h <= curH;
-            const isBooked = bookings.find(b => b.date===od.value && h>=b.startHour && h<b.startHour+b.duration);
+            const isBooked = bookings.find(b => b.date===document.getElementById("od").value && h>=b.startHour && h<b.startHour+b.duration);
             if(isPast) s.classList.add("past");
             else if(isBooked) s.classList.add("booked");
             else {
@@ -171,7 +162,7 @@
 
     function highlight() {
         const slots = document.querySelectorAll("#oGrid .slot");
-        const dr = parseInt(oDur.value) || 1;
+        const dr = parseInt(document.getElementById("oDur").value) || 1;
         slots.forEach(s => s.classList.remove("selected", "preview"));
         if(selS === null) return;
         for(let i=0; i<dr; i++){
@@ -183,20 +174,22 @@
     async function addOff() {
         if(selS === null) return alert("Select a slot!");
         const body = { 
-            name: on.value||"Walk-in", 
-            phone: op.value||"Manual", 
-            date: od.value, 
+            name: document.getElementById("on").value||"Walk-in", 
+            phone: document.getElementById("op").value||"Manual", 
+            date: document.getElementById("od").value, 
             startHour: selS, 
-            duration: parseInt(oDur.value), 
+            duration: parseInt(document.getElementById("oDur").value), 
             sport: "Offline" 
         };
         const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { selS=null; on.value=""; op.value=""; sync(); alert("Offline booking added!"); }
+        if(res.ok) { selS=null; document.getElementById("on").value=""; document.getElementById("op").value=""; sync(); alert("Offline booking added!"); }
     }
 
     async function updatePrice() {
-        if(!nd.value || !nn.value) return alert("Enter both prices!");
-        await fetch(`${BASE_URL}/set-price`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({dayPrice:nd.value, nightPrice:nn.value}) });
+        const nd = document.getElementById("nd").value;
+        const nn = document.getElementById("nn").value;
+        if(!nd || !nn) return alert("Enter both prices!");
+        await fetch(`${BASE_URL}/set-price`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({dayPrice:nd, nightPrice:nn}) });
         alert("Prices Saved!"); sync();
     }
 
