@@ -72,7 +72,7 @@ const BASE_URL = "https://your-app-name.onrender.com";
 
   Type           Username      Password / OTP
   -------------- ------------- ----------------
-  Admin Login     -----          -------
+  Admin Login    JadalZamana   Ayasher123
   Customer OTP   N/A           123456
 
 ## 🛡️ Business Rules
