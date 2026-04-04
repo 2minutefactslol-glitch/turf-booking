@@ -2,7 +2,11 @@
 <html>
 <head>
     <title>TurfPro Admin | Pro Control</title>
-    <script>if(localStorage.getItem("adminLoggedIn")!=="true") window.location.href="login.html";</script>
+    <script>
+        if(localStorage.getItem("adminLoggedIn") !== "true") {
+            window.location.href = "login.html";
+        }
+    </script>
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#f4f6f9; margin:0; padding:20px; }
         .card{ background:white; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05); margin-bottom:20px; }
@@ -87,11 +91,16 @@
 </div>
 
 <script>
-    // IMPORTANT: Change 'localhost' to your laptop's IP address (e.g., 192.168.1.XX)
+    /** * IMPORTANT: Change 'localhost' to your Computer's IP (e.g., 192.168.1.5)
+     * so your phone or other systems can connect to the server.
+     */
     const BASE_URL = "http://localhost:5000"; 
     
-    let bookings = []; let selS = null;
+    let bookings = []; 
+    let selS = null;
     const localToday = new Date().toLocaleDateString('en-CA');
+    
+    // Set default date to today
     document.getElementById('od').setAttribute('min', localToday); 
     document.getElementById('od').value = localToday;
 
@@ -102,13 +111,17 @@
             const bR = await fetch(`${BASE_URL}/bookings`); bookings = await bR.json();
             const dR = await fetch(`${BASE_URL}/dashboard`); const dD = await dR.json();
             document.getElementById("rev").innerText = "₹" + (dD.revenue || 0);
+            
             const pR = await fetch(`${BASE_URL}/current-price`); const pD = await pR.json();
-            document.getElementById("cd").innerText = "₹"+pD.dayPrice; 
-            document.getElementById("cn").innerText = "₹"+pD.nightPrice;
+            document.getElementById("cd").innerText = "₹" + pD.dayPrice; 
+            document.getElementById("cn").innerText = "₹" + pD.nightPrice;
+            
             const sR = await fetch(`${BASE_URL}/booking-status`); const sD = await sR.json();
             document.getElementById("statusTxt").innerText = "Status: " + (sD.paused ? "PAUSED" : "ACTIVE");
-            render(); loadOGrid();
-        } catch(e){ console.log("Connection error to:", BASE_URL); }
+            
+            render(); 
+            loadOGrid();
+        } catch(e){ console.log("Connection error to server."); }
     }
 
     function render() {
@@ -145,10 +158,14 @@
         oGrid.innerHTML = "";
         const curH = new Date().getHours();
         const isToday = document.getElementById("od").value === localToday;
+        
         for(let h=0; h<24; h++){
-            const s = document.createElement("div"); s.className="slot"; s.innerText=fmt(h);
+            const s = document.createElement("div"); 
+            s.className="slot"; 
+            s.innerText=fmt(h);
             const isPast = isToday && h <= curH;
             const isBooked = bookings.find(b => b.date===document.getElementById("od").value && h>=b.startHour && h<b.startHour+b.duration);
+            
             if(isPast) s.classList.add("past");
             else if(isBooked) s.classList.add("booked");
             else {
@@ -167,38 +184,64 @@
         if(selS === null) return;
         for(let i=0; i<dr; i++){
             let h = selS + i;
-            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) slots[h].classList.add(i===0?"selected":"preview");
+            if(slots[h] && !slots[h].classList.contains("booked") && !slots[h].classList.contains("past")) {
+                slots[h].classList.add(i===0 ? "selected" : "preview");
+            }
         }
     }
 
     async function addOff() {
         if(selS === null) return alert("Select a slot!");
         const body = { 
-            name: document.getElementById("on").value||"Walk-in", 
-            phone: document.getElementById("op").value||"Manual", 
+            name: document.getElementById("on").value || "Walk-in", 
+            phone: document.getElementById("op").value || "Manual", 
             date: document.getElementById("od").value, 
             startHour: selS, 
             duration: parseInt(document.getElementById("oDur").value), 
             sport: "Offline" 
         };
-        const res = await fetch(`${BASE_URL}/book`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
-        if(res.ok) { selS=null; document.getElementById("on").value=""; document.getElementById("op").value=""; sync(); alert("Offline booking added!"); }
+        const res = await fetch(`${BASE_URL}/book`, { 
+            method:"POST", 
+            headers:{"Content-Type":"application/json"}, 
+            body:JSON.stringify(body) 
+        });
+        if(res.ok) { 
+            selS=null; 
+            document.getElementById("on").value=""; 
+            document.getElementById("op").value=""; 
+            sync(); 
+            alert("Offline booking added!"); 
+        }
     }
 
     async function updatePrice() {
         const nd = document.getElementById("nd").value;
         const nn = document.getElementById("nn").value;
         if(!nd || !nn) return alert("Enter both prices!");
-        await fetch(`${BASE_URL}/set-price`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({dayPrice:nd, nightPrice:nn}) });
-        alert("Prices Saved!"); sync();
-    }
-
-    async function toggleSys(status) {
-        await fetch(`${BASE_URL}/toggle-booking`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status}) });
+        await fetch(`${BASE_URL}/set-price`, { 
+            method:"POST", 
+            headers:{"Content-Type":"application/json"}, 
+            body:JSON.stringify({dayPrice:nd, nightPrice:nn}) 
+        });
+        alert("Prices Saved!"); 
         sync();
     }
 
-    async function del(id) { if(confirm("Cancel this booking?")) await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); sync(); }
+    async function toggleSys(status) {
+        await fetch(`${BASE_URL}/toggle-booking`, { 
+            method:"POST", 
+            headers:{"Content-Type":"application/json"}, 
+            body:JSON.stringify({status}) 
+        });
+        sync();
+    }
+
+    async function del(id) { 
+        if(confirm("Cancel this booking?")) {
+            await fetch(`${BASE_URL}/booking/${id}`, {method:"DELETE"}); 
+            sync(); 
+        }
+    }
 
     function downloadReport() {
         let csv = "Name,Phone,Date,Time,Total_Price,Advance_Paid,Collected_Balance,Status\n";
@@ -207,10 +250,15 @@
             const status = b.isCollected ? "Fully Paid" : "Advance Only";
             csv += `${b.name},${b.phone},${b.date},${fmt(b.startHour)},${b.totalAmount},${b.advancePaid},${remPaid},${status}\n`;
         });
-        const a = document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download=`Revenue_Report_${localToday}.csv`; a.click();
+        const a = document.createElement('a'); 
+        a.href=URL.createObjectURL(new Blob([csv], {type:'text/csv'})); 
+        a.download=`Revenue_Report_${localToday}.csv`; 
+        a.click();
     }
 
-    setInterval(sync, 3000); sync();
+    // Auto-sync every 3 seconds
+    setInterval(sync, 3000); 
+    sync();
 </script>
 </body>
 </html>
