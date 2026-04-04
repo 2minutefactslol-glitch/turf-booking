@@ -91,16 +91,13 @@
 </div>
 
 <script>
-    /** * IMPORTANT: Change 'localhost' to your Computer's IP (e.g., 192.168.1.5)
-     * so your phone or other systems can connect to the server.
-     */
-    const BASE_URL = "http://localhost:5000"; 
+    // Updated to your specific Network IP
+    const BASE_URL = "http://192.168.0.105:5000"; 
     
     let bookings = []; 
     let selS = null;
     const localToday = new Date().toLocaleDateString('en-CA');
     
-    // Set default date to today
     document.getElementById('od').setAttribute('min', localToday); 
     document.getElementById('od').value = localToday;
 
@@ -121,7 +118,7 @@
             
             render(); 
             loadOGrid();
-        } catch(e){ console.log("Connection error to server."); }
+        } catch(e){ console.log("Connection error to server at " + BASE_URL); }
     }
 
     function render() {
@@ -256,7 +253,6 @@
         a.click();
     }
 
-    // Auto-sync every 3 seconds
     setInterval(sync, 3000); 
     sync();
 </script>
