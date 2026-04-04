@@ -2,36 +2,52 @@
 <html>
 <head>
     <title>TurfPro | Admin Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body{ font-family: 'Segoe UI', sans-serif; background:#1e3c72; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-        .card{ background:white; padding:30px; border-radius:15px; width:90%; max-width:350px; text-align:center; }
-        input{ width:100%; padding:12px; margin:10px 0; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
-        .btn{ width:100%; padding:12px; background:#1e3c72; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; }
+        .card{ background:white; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.2); width:90%; max-width:350px; text-align:center; }
+        h2{ color:#1e3c72; margin-bottom:20px; }
+        input{ width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:8px; box-sizing:border-box; font-size:1rem; }
+        .btn{ width:100%; padding:12px; background:#1e3c72; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:1rem; margin-top:10px; transition: 0.3s; }
+        .btn:hover{ background:#152a50; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>🔐 Admin Portal</h2>
+        <p style="color:#64748b; font-size:0.8rem;">Authorized Personnel Only</p>
         <input id="user" placeholder="Username">
         <input id="pass" type="password" placeholder="Password">
-        <button class="btn" onclick="login()">Login</button>
+        <button class="btn" onclick="login()">Enter Dashboard</button>
     </div>
 
     <script>
-        async function login() {
-            const body = { username: user.value, password: pass.value };
-            // Replace 'localhost' with your IP if testing on other devices
-            const res = await fetch("http://localhost:5000/admin-login", {
-                method: "POST",
-                headers: {"Content-Type":"application/json"},
-                body: JSON.stringify(body)
-            });
+        // IMPORTANT: Change 'localhost' to your Computer's IP (e.g., 192.168.1.5) 
+        // if you are testing on a phone or another laptop.
+        const BASE_URL = "http://localhost:5000"; 
 
-            if(res.ok) {
-                localStorage.setItem("adminLoggedIn", "true"); // THIS IS THE KEY
-                window.location.href = "admin.html";
-            } else {
-                alert("Invalid Admin Credentials!");
+        async function login() {
+            const u = document.getElementById("user").value;
+            const p = document.getElementById("pass").value;
+
+            try {
+                const res = await fetch(`${BASE_URL}/admin-login`, {
+                    method: "POST",
+                    headers: {"Content-Type":"application/json"},
+                    body: JSON.stringify({ username: u, password: p })
+                });
+
+                const data = await res.json();
+
+                if(res.ok && data.success) {
+                    // This sets the permission key your Admin page looks for
+                    localStorage.setItem("adminLoggedIn", "true");
+                    window.location.href = "admin.html";
+                } else {
+                    alert("Invalid Admin Credentials!");
+                }
+            } catch (e) {
+                alert("Server not reachable! Check if your backend is running.");
             }
         }
     </script>
