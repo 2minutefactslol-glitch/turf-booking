@@ -2,7 +2,10 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
-app.use(cors()); app.use(express.json());
+
+// Updated CORS to ensure other devices can connect without issues
+app.use(cors({ origin: "*" })); 
+app.use(express.json());
 
 const DB_URI = "mongodb://Admin:Nihalreddy123@ac-ktmpoty-shard-00-00.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-01.d0nniyi.mongodb.net:27017,ac-ktmpoty-shard-00-02.d0nniyi.mongodb.net:27017/turf?ssl=true&replicaSet=atlas-14f8at-shard-0&authSource=admin&retryWrites=true&w=majority";
 mongoose.connect(DB_URI).then(() => console.log("✅ MongoDB Connected (Advance Payment Mode)"));
@@ -109,5 +112,9 @@ app.get("/dashboard", async (req, res) => {
     res.json({ revenue: rev });
 });
 
+// Bind to 0.0.0.0 to allow access from any device on your local network
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("🚀 Server Live (10% Advance Mode)"));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server Live (10% Advance Mode)`);
+    console.log(`Port: ${PORT}`);
+});
